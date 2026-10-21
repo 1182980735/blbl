@@ -26,9 +26,14 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
 object ApkUpdater {
-    private const val DEBUG_APK_URL = "https://cat3399.top/blbl/blbl-latest-debug.apk"
-    private const val RELEASE_APK_URL = "https://cat3399.top/blbl/blbl-latest-release.apk"
-    private const val CHANGELOG_URL = "https://cat3399.top/blbl/CHANGELOG.md"
+    // 自建发布的更新源：GitHub Releases。
+    // 每次发布时需同时上传固定文件名的 APK（blbl-latest-debug.apk / blbl-latest-release.apk）。
+    private const val REPO_OWNER = "1182980735"
+    private const val REPO_NAME = "blbl"
+    private const val RELEASES_BASE = "https://github.com/$REPO_OWNER/$REPO_NAME/releases"
+    private const val DEBUG_APK_URL = "$RELEASES_BASE/latest/download/blbl-latest-debug.apk"
+    private const val RELEASE_APK_URL = "$RELEASES_BASE/latest/download/blbl-latest-release.apk"
+    private const val CHANGELOG_URL = "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main/CHANGELOG.md"
     val TEST_APK_URL: String
         get() = if (BuildConfig.DEBUG) DEBUG_APK_URL else RELEASE_APK_URL
     val TEST_CHANGELOG_URL: String
@@ -179,7 +184,7 @@ object ApkUpdater {
     fun apkUrlFor(versionName: String): String {
         val cleanVersion = versionName.trim().removePrefix("v")
         val channel = if (BuildConfig.DEBUG) "debug" else "release"
-        return "https://cat3399.top/blbl/blbl-$cleanVersion-$channel.apk"
+        return "$RELEASES_BASE/download/v$cleanVersion/blbl-latest-$channel.apk"
     }
 
     private data class VersionHeading(
