@@ -29,6 +29,14 @@ android {
     }
 
     signingConfigs {
+        // 固定 debug 签名：保证每次构建 / 每台机器（含 CI）产出的 debug 包签名一致，
+        // 用户可以直接覆盖安装升级。debug keystore 的密码是 Android 公开默认值。
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         create("release") {
             storeFile = rootProject.file("keystore/release.keystore")
             storePassword = propOrEnv("RELEASE_STORE_PASSWORD")
