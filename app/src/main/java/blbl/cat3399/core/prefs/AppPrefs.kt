@@ -10,6 +10,20 @@ import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+/**
+ * 应用偏好设置管理类
+ *
+ * 封装了SharedPreferences的访问，提供类型安全的属性访问方式。
+ * 包含以下配置项：
+ * - 免责声明接受状态
+ * - 认证会话信息
+ * - UI配置（侧边栏大小、UI缩放、主题）
+ * - 启动页面设置
+ * - 播放器配置
+ * - 弹幕配置
+ * - 网络配置
+ * - 更新配置
+ */
 class AppPrefs(context: Context) {
     private val appContext = context.applicationContext
     private val prefs = context.getSharedPreferences("blbl_prefs", Context.MODE_PRIVATE)

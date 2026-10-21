@@ -111,17 +111,37 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+/**
+ * 播放器Activity，负责视频播放的完整流程
+ *
+ * 包含以下核心功能：
+ * - 视频/直播播放控制
+ * - 弹幕渲染和管理
+ * - 自动续播和自动跳过
+ * - 播放列表管理（分P/合集/推荐）
+ * - 社交互动（点赞、投币、收藏）
+ * - 弹幕设置和字幕支持
+ * - 播放器调试和性能监控
+ */
 class PlayerActivity : BaseActivity() {
     override fun shouldRecreateOnUiScaleChange(): Boolean = true
 
+    /** 视图绑定 */
     internal lateinit var binding: ActivityPlayerBinding
+    /** UP主快捷卡片控制器 */
     internal lateinit var upQuickCard: PlayerUpQuickCardController
+    /** 当前UP主ID */
     internal val currentUpMid: Long get() = if (::upQuickCard.isInitialized) upQuickCard.currentMid else 0L
+    /** 当前UP主名称 */
     internal val currentUpName: String? get() = if (::upQuickCard.isInitialized) upQuickCard.currentName else null
+    /** 当前UP主头像 */
     internal val currentUpAvatar: String? get() = if (::upQuickCard.isInitialized) upQuickCard.currentAvatar else null
+    /** 当前UP主是否已关注 */
     internal val currentUpFollowed: Boolean? get() = if (::upQuickCard.isInitialized) upQuickCard.currentFollowed else null
+    /** 关注操作是否正在进行中 */
     internal val upFollowActionInFlight: Boolean get() = if (::upQuickCard.isInitialized) upQuickCard.followActionInFlight else false
 
+    /** 播放器引擎实例 */
     internal var player: BlblPlayerEngine? = null
     private var ijkRenderView: View? = null
     private var ijkTextureSurface: Surface? = null

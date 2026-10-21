@@ -69,9 +69,9 @@ internal interface DanmakuEngineActionApi {
 }
 
 /**
- * Danmaku engine:
- * - Action thread owns timeline admission and lane selection.
- * - Main thread only consumes render snapshot and computes current scroll positions.
+ * 弹幕引擎：
+ * - Action线程负责时间线准入和轨道选择
+ * - Main线程仅消费渲染快照并计算当前滚动位置
  */
 internal class DanmakuEngine(
     private val displayMetrics: DisplayMetrics,

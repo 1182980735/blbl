@@ -1,5 +1,10 @@
 package blbl.cat3399.core.model
 
+/**
+ * 番剧季数据模型
+ *
+ * 表示番剧的一个季（Season），包含季的基本信息和观看进度。
+ */
 data class BangumiSeason(
     val seasonId: Long,
     val seasonTypeName: String?,
@@ -15,6 +20,11 @@ data class BangumiSeason(
     val isFinish: Boolean?,
 )
 
+/**
+ * 番剧分集数据模型
+ *
+ * 表示番剧的单集信息，包含播放所需的各种ID和标题。
+ */
 data class BangumiEpisode(
     val epId: Long,
     val aid: Long?,
@@ -26,11 +36,21 @@ data class BangumiEpisode(
     val badge: String?,
 )
 
+/**
+ * 番剧分集章节数据模型
+ *
+ * 将分集按章节分组，用于展示多章节番剧。
+ */
 data class BangumiEpisodeSection(
     val title: String,
     val episodes: List<BangumiEpisode>,
 )
 
+/**
+ * 番剧季详情数据模型
+ *
+ * 包含番剧季的完整信息，包括评分、播放量、分集列表和观看进度。
+ */
 data class BangumiSeasonDetail(
     val seasonId: Long,
     val title: String,

@@ -24,6 +24,12 @@ import blbl.cat3399.ui.RefreshKeyHandler
 import blbl.cat3399.ui.SidebarFocusHost
 import com.google.android.material.tabs.TabLayout
 
+/**
+ * 首页Fragment，展示推荐视频和番剧内容
+ *
+ * 使用ViewPager2实现多标签页切换，包括推荐视频、番剧、国创等标签。
+ * 实现了 [VideoGridTabSwitchFocusHost] 接口支持焦点管理，[BackPressHandler] 接口支持返回键处理。
+ */
 class HomeFragment : Fragment(), VideoGridTabSwitchFocusHost, BackPressHandler {
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!

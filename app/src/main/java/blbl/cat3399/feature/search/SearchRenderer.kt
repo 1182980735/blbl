@@ -33,6 +33,11 @@ import blbl.cat3399.feature.video.openVideoDetailFromPlaybackHandle
 import blbl.cat3399.feature.video.openVideoFromPlaybackHandle
 import com.google.android.material.card.MaterialCardView
 
+/**
+ * 搜索渲染器，负责搜索页面的UI渲染和交互处理
+ *
+ * 包括：搜索输入面板、搜索结果面板、键盘导航、焦点管理等
+ */
 class SearchRenderer internal constructor(
     private val fragment: SearchFragment,
     private val binding: FragmentSearchBinding,

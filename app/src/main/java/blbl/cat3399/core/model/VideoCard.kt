@@ -1,5 +1,11 @@
 package blbl.cat3399.core.model
 
+/**
+ * 视频卡片数据模型
+ *
+ * 用于表示视频列表中的单个视频项，包含视频基本信息、封面、播放数据等。
+ * 支持普通视频、番剧(PVC)、电视剧等多种类型。
+ */
 data class VideoCard(
     val bvid: String,
     val cid: Long?,
@@ -18,19 +24,21 @@ data class VideoCard(
     val pubDate: Long?,
     val pubDateText: String?,
     val isChargingArc: Boolean = false,
-    // Optional overlay text rendered on the cover (bottom-left). Used by PGC episode cards.
     val coverLeftBottomText: String? = null,
-    // Optional access badge rendered on the cover (top-right). Used by PGC ("大会员"/"限免"/"付费") etc.
     val accessBadgeText: String? = null,
-    // Optional season id (ssid). Used by PGC playback/reporting flows.
     val seasonId: Long? = null,
-    // Optional last watched progress from listing APIs (seconds).
     val progressSec: Long? = null,
-    // True when the listing API marks this item as fully watched.
     val progressFinished: Boolean = false,
-    // Optional recommendation/search routing id used by web feedback/report flows.
     val trackId: String? = null,
 ) {
+    /**
+     * 生成稳定的唯一标识键
+     *
+     * 按优先级依次使用bvid、epId、seasonId、aid、cid，最后使用title哈希。
+     * 用于RecyclerView的DiffUtil和列表去重。
+     *
+     * @return 稳定的唯一标识字符串
+     */
     fun stableKey(): String =
         when {
             bvid.isNotBlank() -> "bvid:$bvid"

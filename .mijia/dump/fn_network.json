@@ -1,0 +1,295 @@
+[
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://anhuihl.5ddd.com/",
+    "post": "",
+    "headers": {
+      "accept-language": "zh-CN",
+      "upgrade-insecure-requests": "1",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"macOS\""
+    }
+  },
+  {
+    "kind": "resp",
+    "status": 302,
+    "url": "https://anhuihl.5ddd.com/",
+    "body": ""
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://5ddd.com/anhuihl/",
+    "post": "",
+    "headers": {
+      "accept-language": "zh-CN",
+      "upgrade-insecure-requests": "1",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"macOS\""
+    }
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://5ddd.com/anhuihl/",
+    "body": ""
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://static2.fnnas.com/connect/assets/1MPg8Gvv7C7Lrf46.js",
+    "post": "",
+    "headers": {
+      "origin": "https://5ddd.com",
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://5ddd.com/",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://static2.fnnas.com/connect/assets/BeJQwDfNoNFoedLu.css",
+    "post": "",
+    "headers": {
+      "origin": "https://5ddd.com",
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://5ddd.com/",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://static2.fnnas.com/connect/assets/BeJQwDfNoNFoedLu.css",
+    "body": "@charset \"UTF-8\";body,body .semi-always-light,:host,:host .semi-always-light{--semi-amber-0: 254,251,235;--semi-amber-1: 252,245,206;--semi-amber-2: 249,232,158;--semi-amber-3: 246,216,111;--semi-amber-4: 243,198,65;--semi-amber-5: 240,177,20;--semi-amber-6: 200,138,15;--semi-amber-7: 160,102,10;--semi-amber-8: 120,70,6;--semi-amber-9: 80,43,3;--semi-black: 0,0,0;--semi-blue-0: 234,245,255;--semi-blue-1: 203,231,254;--semi-blue-2: 152,205,253;--semi-blue-3: 101,178,252;--semi-blue-4: 50,149,251;--semi-blue-5: 0,100,250;--semi-blue-6: 0,98,214;--semi-blue-7: 0,79,179;--semi-blue-8: 0,61,143;--s"
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://static2.fnnas.com/connect/assets/1MPg8Gvv7C7Lrf46.js",
+    "body": "const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=[\"assets/CN-UzcqeKMKjhvkk.js\",\"assets/D0LsnJaXTYs3tLMB.js\",\"assets/CX7jUH-xNTBQfJPG.js\"])))=>i.map(i=>d[i]);\nvar Yr=Object.defineProperty;var Xr=(a,s,o)=>s in a?Yr(a,s,{enumerable:!0,configurable:!0,writable:!0,value:o}):a[s]=o;var Vr=(a,s,o)=>Xr(a,typeof s!=\"symbol\"?s+\"\":s,o);function _mergeNamespaces(a,s){for(var o=0;o<s.length;o++){const c=s[o];if(typeof c!=\"string\"&&!Array.isArray(c)){for(const g in c)if(g!==\"default\"&&!(g in a)){const _=Object.getOwnPropertyDescriptor(c,g);_&&Object.defineProperty(a,g,_.get?_:{enumerable:!0,get:()=>c"
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://static2.fnnas.com/connect/locales/zh-CN/translation.057dee76.json",
+    "post": "",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://5ddd.com/",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "accept": "application/json",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://static2.fnnas.com/connect/locales/zh-CN/translation.057dee76.json",
+    "body": "{\n  \"address\": {\n    \"ddnsDomain\": \"DDNS 域名\",\n    \"ddnsWarning\": \"没有安全证书时，部分浏览器可能无法连接\",\n    \"detectedAccessMethods\": \"检测到 NAS 支持以下访问方式\",\n    \"httpWarning\": \"HTTP 明文传输，请在安全环境中使用\",\n    \"publicIp\": \"公网 IP\",\n    \"relay\": \"中继转发\",\n    \"selectAccessMethod\": \"请选择一种方式访问 <link>{id}</link>\"\n  },\n  \"idCheck\": {\n    \"consecutiveDashes\": \"{brandId} 不能出现连续的\\\"--\\\"\",\n    \"endWithDash\": \"{brandId} 不能以\\\"-\\\"结尾\",\n    \"invalidChars\": \"{brandId} 只能输入小写字母、数字及\\\"-\\\"\",\n    \"maxLength\": \"{brandId} 不超过 30 个字符\",\n    \"minLength\": \"{brandId} 至少 6 个字符\",\n    \"required\": \"{brandId} 不能为空\",\n    \"startWithLetter\": \"{brandId} 必须以小写"
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://static2.fnnas.com/connect/assets/CLbMfwyeTXqjC-26.js",
+    "post": "",
+    "headers": {
+      "origin": "https://5ddd.com",
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://static2.fnnas.com/connect/assets/1MPg8Gvv7C7Lrf46.js",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://static2.fnnas.com/connect/assets/sZls3Q25Ae1gk9DD.otf",
+    "post": "",
+    "headers": {
+      "origin": "https://5ddd.com",
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://static2.fnnas.com/connect/assets/BeJQwDfNoNFoedLu.css",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://static2.fnnas.com/connect/assets/CLbMfwyeTXqjC-26.js",
+    "body": "import{C as e}from\"./1MPg8Gvv7C7Lrf46.js\";export{e as default};\n"
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://static2.fnnas.com/connect/assets/sZls3Q25Ae1gk9DD.otf",
+    "body": "<binary>"
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://static2.fnnas.com/connect/assets/3GlCoaon44ReFMA_.webp",
+    "post": "",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://static2.fnnas.com/connect/assets/BeJQwDfNoNFoedLu.css",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://static2.fnnas.com/connect/assets/DO9WfvJgpCmVeFQF.png",
+    "post": "",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://5ddd.com/",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://static2.fnnas.com/connect/assets/MgP8KZ4BYwrkrkpH.otf",
+    "post": "",
+    "headers": {
+      "origin": "https://5ddd.com",
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://static2.fnnas.com/connect/assets/BeJQwDfNoNFoedLu.css",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://static2.fnnas.com/connect/assets/3GlCoaon44ReFMA_.webp",
+    "body": "<binary>"
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://static2.fnnas.com/connect/assets/DO9WfvJgpCmVeFQF.png",
+    "body": "<binary>"
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://static2.fnnas.com/connect/assets/MgP8KZ4BYwrkrkpH.otf",
+    "body": "<binary>"
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://static2.fnnas.com/connect/assets/21M6-T9DfvsesjS-.png",
+    "post": "",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://5ddd.com/",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://static2.fnnas.com/connect/assets/Bbv9gbFAoN9Jwls2.png",
+    "post": "",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://5ddd.com/",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "kind": "req",
+    "method": "POST",
+    "url": "https://5ddd.com/api/v1/fn/con",
+    "post": "{\"fnId\":\"anhuihl\"}",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://5ddd.com/anhuihl/",
+      "fn-sign": "c5ccc7ad8906c54258c7e82aa0d76bf2ac7cb3271626d87bff7f707ef810c877",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "accept-language": "zh-CN",
+      "sec-ch-ua-mobile": "?0",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "accept": "application/json, text/plain, */*",
+      "content-type": "application/json",
+      "authx": "nonce=132628&timestamp=1791626745016&sign=42b0c8152e769a03a979b20217ee1f3d"
+    }
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://static2.fnnas.com/connect/assets/Bbv9gbFAoN9Jwls2.png",
+    "body": "<binary>"
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://static2.fnnas.com/connect/assets/21M6-T9DfvsesjS-.png",
+    "body": "<binary>"
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://5ddd.com/api/v1/fn/con",
+    "body": "{\"msg\":\"\",\"code\":0,\"data\":{\"ddns\":null,\"ipv4\":[\"192.168.8.122\"],\"ipv6\":[],\"publicIpv4\":[\"115.210.208.198\"],\"publicIpv6\":[],\"fn\":[\"anhuihl.5ddd.com:443\"],\"port\":{\"httpsPort\":5667,\"httpPort\":5666},\"checkSum\":\"47039\",\"ver\":\"3.0.0\",\"forbbidPublicIpv6\":false}}"
+  },
+  {
+    "kind": "req",
+    "method": "GET",
+    "url": "https://anhuihl.5ddd.com/trimcon",
+    "post": "",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://5ddd.com/",
+      "accept-language": "zh-CN",
+      "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-origin": "*",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+      "accept": "application/json, text/plain, */*"
+    }
+  },
+  {
+    "kind": "resp",
+    "status": 200,
+    "url": "https://anhuihl.5ddd.com/trimcon",
+    "body": ""
+  }
+]

@@ -54,9 +54,17 @@ import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.Locale
 
+/**
+ * 主活动，负责应用的主要导航和界面管理
+ *
+ * 包括：侧边栏导航、主内容区域管理、用户信息面板、焦点管理、DPAD键盘导航等
+ */
 class MainActivity : BaseActivity(), SidebarFocusHost {
+    /** 用户信息覆盖层模式 */
     private enum class UserInfoOverlayMode {
+        /** 个人资料模式 */
         PROFILE,
+        /** 账号切换模式 */
         ACCOUNT_SWITCH,
     }
 
@@ -88,9 +96,13 @@ class MainActivity : BaseActivity(), SidebarFocusHost {
     private var lastBackAtMs: Long = 0L
     private var lastMainFocusAtMs: Long = 0L
 
+    /** 焦点能力快照，用于保存和恢复View的焦点相关属性 */
     private data class FocusabilitySnapshot(
+        /** 后代焦点能力 */
         val descendantFocusability: Int,
+        /** 是否可获取焦点 */
         val isFocusable: Boolean,
+        /** 是否可在触摸模式下获取焦点 */
         val isFocusableInTouchMode: Boolean,
     )
 

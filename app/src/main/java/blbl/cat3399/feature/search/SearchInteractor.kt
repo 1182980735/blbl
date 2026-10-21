@@ -15,6 +15,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * 搜索交互器，负责搜索业务逻辑处理
+ *
+ * 包括：搜索历史管理、热门搜索加载、搜索建议、搜索执行、分页加载等
+ */
 class SearchInteractor(
     private val fragment: SearchFragment,
     private val state: SearchState,

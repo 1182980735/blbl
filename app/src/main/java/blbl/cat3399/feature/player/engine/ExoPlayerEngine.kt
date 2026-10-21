@@ -45,20 +45,37 @@ import java.util.Locale
 import java.util.concurrent.CopyOnWriteArraySet
 import kotlin.math.roundToLong
 
+/**
+ * 直播HLS调试信息
+ */
 internal data class LiveHlsDebugInfo(
+    /** 媒体序列号 */
     val mediaSequence: Long?,
+    /** 目标时长（秒） */
     val targetDurationSec: Double?,
+    /** 映射文件URI */
     val mapUri: String?,
+    /** 分段总数 */
     val segmentCount: Int,
+    /** 最近分段数 */
     val recentSegmentCount: Int,
+    /** 最近比特率（bps） */
     val recentBitrateBps: Long?,
+    /** 最后分段URI */
     val lastSegmentUri: String?,
+    /** 最后分段时长（秒） */
     val lastSegmentDurationSec: Double?,
+    /** 最后分段字节数 */
     val lastSegmentBytes: Long?,
+    /** 最后分段序列号 */
     val lastSegmentSequence: Long?,
+    /** 最后辅助数据原始内容 */
     val lastAuxRaw: String?,
 )
 
+/**
+ * 基于ExoPlayer的播放器引擎实现
+ */
 internal class ExoPlayerEngine(
     context: Context,
     private val okHttpClient: OkHttpClient = BiliClient.cdnOkHttp,
@@ -69,22 +86,28 @@ internal class ExoPlayerEngine(
 ) : BlblPlayerEngine {
     private val appContext: Context = context.applicationContext
 
+    /** 音量平衡音频处理器 */
     private val volumeBalanceProcessor = VolumeBalanceAudioProcessor(level = audioBalanceLevel)
+
+    /** 加载控制器，保留后缓冲区以支持在缓冲内seek */
     private val loadControl: DefaultLoadControl =
         DefaultLoadControl.Builder()
-            // Keep roughly one forward buffer window behind the playhead so in-buffer seek
-            // does not immediately discard media that was already fetched.
+            // 保留大约一个前向缓冲窗口在播放头后面，以便缓冲内seek不会立即丢弃已获取的媒体
             .setBackBuffer(DefaultLoadControl.DEFAULT_MAX_BUFFER_MS, true)
             .build()
+
+    /** 直播HLS播放列表解析器工厂 */
     private val liveHlsPlaylistParserFactory: HlsPlaylistParserFactory =
         ExtXStartStrippingHlsPlaylistParserFactory(onPlaylistParsed = onLiveHlsDebugInfo)
 
+    /** ExoPlayer实例 */
     val exoPlayer: ExoPlayer =
         ExoPlayer.Builder(context, BlblRenderersFactory(context.applicationContext, volumeBalanceProcessor))
             .setLoadControl(loadControl)
             .setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF)
             .build()
 
+    /** 播放监听器集合 */
     private val listeners: MutableSet<BlblPlayerEngine.Listener> = CopyOnWriteArraySet()
 
     override val kind: PlayerEngineKind = PlayerEngineKind.ExoPlayer

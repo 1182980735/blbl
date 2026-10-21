@@ -1,0 +1,8 @@
+[2026-10-10 18:13:00] ========================================================================
+[2026-10-10 18:13:00] 守护启动 dry_run=True 间隔=180s 阈值=2 断电=10.0s 冷却=900s
+[2026-10-10 18:13:26] 收到信号 15，准备退出…
+[2026-10-10 18:13:26] FAIL 1/2  stage=login_page  detail=TargetClosedError: Page.wait_for_selector: Target page, context or browser has been closed
+Call log:
+  - waiting for locator("#username") to be visible
+  26.3s
+[2026-10-10 18:13:26] 守护退出

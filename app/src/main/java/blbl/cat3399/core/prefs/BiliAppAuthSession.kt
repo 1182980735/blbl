@@ -3,6 +3,12 @@ package blbl.cat3399.core.prefs
 import org.json.JSONArray
 import org.json.JSONObject
 
+/**
+ * B站APP授权会话数据模型
+ *
+ * 存储APP端登录后的授权信息，包括访问令牌、刷新令牌、用户ID等。
+ * 支持从TV登录数据和JSON序列化数据中解析。
+ */
 data class BiliAppAuthSession(
     val accessToken: String,
     val refreshToken: String?,
@@ -19,9 +25,15 @@ data class BiliAppAuthSession(
     val cookieDomains: List<String>,
     val rawDataJson: String,
 ) {
+    /** 访问密钥（与accessToken相同） */
     val accessKey: String
         get() = accessToken
 
+    /**
+     * 将会话数据转换为JSON对象
+     *
+     * @return JSON对象
+     */
     fun toJson(): JSONObject {
         val root =
             JSONObject()
@@ -61,6 +73,17 @@ data class BiliAppAuthSession(
         private const val KEY_COOKIE_INFO_DOMAINS = "cookie_info_domains"
         private const val KEY_RAW_DATA = "raw_data"
 
+        /**
+         * 从TV登录数据解析授权会话
+         *
+         * @param data TV登录返回的JSON数据
+         * @param appKey APP密钥
+         * @param mobiApp APP标识
+         * @param platform 平台标识
+         * @param localId 本地设备ID
+         * @param issuedAtMs 颁发时间戳（毫秒）
+         * @return 授权会话，如果解析失败则返回null
+         */
         fun fromTvLoginData(
             data: JSONObject,
             appKey: String,
@@ -106,6 +129,12 @@ data class BiliAppAuthSession(
             )
         }
 
+        /**
+         * 从JSON对象解析授权会话
+         *
+         * @param root JSON对象
+         * @return 授权会话，如果解析失败则返回null
+         */
         fun fromJson(root: JSONObject): BiliAppAuthSession? {
             val accessToken =
                 firstNonBlank(

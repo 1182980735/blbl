@@ -22,17 +22,34 @@ import javax.crypto.spec.OAEPParameterSpec
 import javax.crypto.spec.PSource
 import javax.crypto.spec.SecretKeySpec
 
+/**
+ * Web Cookie维护器
+ *
+ * 负责管理和维护B站Web端所需的各种Cookie，包括：
+ * - Buvid设备指纹Cookie（buvid3, buvid4, b_nut）
+ * - BiliTicket票据Cookie
+ * - Cookie自动刷新
+ * - Buvid每日激活
+ */
 object WebCookieMaintainer {
     private const val TAG = "WebCookieMaintainer"
 
+    /** BiliTicket密钥ID */
     private const val BILI_TICKET_KEY_ID = "ec02"
+    /** BiliTicket HMAC密钥 */
     private const val BILI_TICKET_HMAC_KEY = "XgwSnGZ1p"
 
+    /** Cookie刷新来源标识 */
     private const val REFRESH_SOURCE = "main_web"
 
+    /** 用于从网页中提取refresh_csrf的正则表达式 */
     private val refreshCsrfRegex = Regex("<div\\s+id=\"1-name\">\\s*([0-9a-fA-F]{16,})\\s*</div>")
 
-    // From bilibili-api-docs cookie_refresh.md
+    /**
+     * 用于Cookie刷新的RSA公钥
+     *
+     * 来源于bilibili-api-docs的cookie_refresh.md文档
+     */
     private val correspondPublicKey: PublicKey by lazy {
         val derBase64 =
             "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDLgd2OAkcGVtoE3ThUREbio0Eg" +
@@ -44,8 +61,16 @@ object WebCookieMaintainer {
         KeyFactory.getInstance("RSA").generatePublic(spec)
     }
 
+    /** Cookie刷新互斥锁，防止并发刷新 */
     private val cookieRefreshMutex = Mutex()
 
+    /**
+     * 确保Buvid每日激活一次
+     *
+     * 通过向B站服务器发送设备指纹信息，保持buvid的活跃状态，这对于某些API的正常调用是必要的
+     *
+     * @param nowMs 当前时间戳（毫秒），默认使用系统当前时间
+     */
     suspend fun ensureBuvidActiveOncePerDay(nowMs: Long = System.currentTimeMillis()) {
         val midStr = BiliClient.cookies.getCookieValue("DedeUserID")?.trim().orEmpty()
         val mid = midStr.toLongOrNull()?.takeIf { it > 0 } ?: return
@@ -55,7 +80,7 @@ object WebCookieMaintainer {
         runCatching {
             val rand = ByteArray(32 + 8 + 4)
             java.security.SecureRandom().nextBytes(rand)
-            // Overwrite middle bytes to mimic PiliPlus' fixed PNG tail marker.
+            // 覆盖中间字节以模拟PiliPlus的固定PNG尾部标记
             rand[32] = 0
             rand[33] = 0
             rand[34] = 0
@@ -124,6 +149,14 @@ object WebCookieMaintainer {
         }
     }
 
+    /**
+     * 生成Aurora设备ID
+     *
+     * 使用简单的XOR加密算法对用户ID进行加密，用于设备识别
+     *
+     * @param mid 用户ID
+     * @return Base64编码后的Aurora设备ID，如果mid无效则返回null
+     */
     private fun genAuroraEid(mid: Long): String? {
         if (mid <= 0) return null
         val key = "ad1va46a7lza".toByteArray()
@@ -133,6 +166,11 @@ object WebCookieMaintainer {
         return android.util.Base64.encodeToString(out, android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
     }
 
+    /**
+     * 确保播放所需的Cookie都处于健康状态
+     *
+     * 在播放视频/直播前调用，确保所有必要的Cookie都已准备好
+     */
     suspend fun ensureHealthyForPlay() {
         ensureWebFingerprintCookies()
         ensureBuvidActiveOncePerDay()
@@ -140,11 +178,24 @@ object WebCookieMaintainer {
         refreshCookieIfNeededOncePerDay()
     }
 
+    /**
+     * 执行每日Cookie维护任务
+     *
+     * 定期调用以确保Cookie的有效性和安全性
+     */
     suspend fun ensureDailyMaintenance() {
         ensureBiliTicket()
         refreshCookieIfNeededOncePerDay()
     }
 
+    /**
+     * 确保Web指纹Cookie存在
+     *
+     * 检查并获取以下Cookie：
+     * - buvid3: 通过访问B站首页或finger/spi接口获取
+     * - buvid4: 通过finger/spi接口获取
+     * - b_nut: 通过访问B站首页获取
+     */
     suspend fun ensureWebFingerprintCookies() {
         val startMs = SystemClock.elapsedRealtime()
         val hasBuvid3 = !BiliClient.cookies.getCookieValue("buvid3").isNullOrBlank()
@@ -184,6 +235,17 @@ object WebCookieMaintainer {
         AppLog.i(TAG, "ensureWebFingerprintCookies exit cost=${SystemClock.elapsedRealtime() - startMs}ms")
     }
 
+    /**
+     * 确保BiliTicket存在且有效
+     *
+     * BiliTicket是B站用于验证用户身份的临时票据，有效期较短，需要定期更新
+     *
+     * 刷新流程：
+     * 1. 检查现有ticket是否在6小时内过期
+     * 2. 如果需要刷新，使用HMAC-SHA256生成签名
+     * 3. 调用GenWebTicket接口获取新ticket
+     * 4. 更新Cookie存储
+     */
     suspend fun ensureBiliTicket() {
         val nowMs = System.currentTimeMillis()
         val epochDay = nowMs / 86_400_000L
@@ -232,6 +294,17 @@ object WebCookieMaintainer {
         }
     }
 
+    /**
+     * 每日检查并刷新Cookie（如果需要）
+     *
+     * Cookie刷新流程：
+     * 1. 检查是否有SESSDATA和refresh_token
+     * 2. 查询Cookie状态，判断是否需要刷新
+     * 3. 如果需要刷新，获取refresh_csrf（通过RSA加密时间戳获取对应路径）
+     * 4. 调用cookie/refresh接口刷新Cookie
+     * 5. 更新refresh_token
+     * 6. 调用confirm/refresh确认刷新
+     */
     suspend fun refreshCookieIfNeededOncePerDay() {
         if (!BiliClient.cookies.hasSessData()) return
         val refreshToken = BiliClient.prefs.webRefreshToken?.takeIf { it.isNotBlank() } ?: return
@@ -296,6 +369,14 @@ object WebCookieMaintainer {
         }
     }
 
+    /**
+     * 创建B站Cookie
+     *
+     * @param name Cookie名称
+     * @param value Cookie值
+     * @param expiresAt 过期时间戳（毫秒）
+     * @return Cookie实例
+     */
     private fun buildCookie(name: String, value: String, expiresAt: Long): Cookie {
         return Cookie.Builder()
             .name(name)
@@ -307,6 +388,13 @@ object WebCookieMaintainer {
             .build()
     }
 
+    /**
+     * 计算字符串的HMAC-SHA256哈希值并转换为十六进制字符串
+     *
+     * @param key HMAC密钥
+     * @param message 消息内容
+     * @return HMAC-SHA256哈希值的十六进制表示
+     */
     private fun hmacSha256Hex(key: String, message: String): String {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(key.toByteArray(StandardCharsets.UTF_8), "HmacSHA256"))
@@ -316,6 +404,14 @@ object WebCookieMaintainer {
         return sb.toString()
     }
 
+    /**
+     * 获取Cookie刷新对应的路径
+     *
+     * 使用RSA-OAEP加密"refresh_时间戳"字符串，用于获取refresh_csrf
+     *
+     * @param timestampMs 时间戳（毫秒）
+     * @return RSA加密后的十六进制字符串，作为对应路径
+     */
     private fun getCorrespondPath(timestampMs: Long): String {
         val plaintext = "refresh_$timestampMs"
         val input = plaintext.toByteArray(StandardCharsets.UTF_8)

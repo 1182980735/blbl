@@ -2,6 +2,11 @@ package blbl.cat3399.feature.search
 
 import blbl.cat3399.core.paging.PagedGridStateMachine
 
+/**
+ * 搜索状态管理器，管理搜索页面的所有状态数据
+ *
+ * 包括：搜索查询、历史记录、搜索建议、热门搜索、分页状态、焦点状态等
+ */
 class SearchState {
     var defaultHint: String? = null
     var query: String = ""

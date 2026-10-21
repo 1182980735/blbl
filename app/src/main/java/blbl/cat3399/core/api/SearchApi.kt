@@ -10,33 +10,45 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
+/**
+ * 搜索相关API内部封装类
+ *
+ * 提供搜索功能相关的API封装，包括：
+ * - 搜索默认文本
+ * - 热门搜索词
+ * - 搜索建议
+ * - 视频搜索
+ * - 影视/番剧搜索
+ * - 直播间搜索
+ * - 用户搜索
+ */
 internal object SearchApi {
+    /** JSON对象抽象接口，用于统一解析不同来源的JSON数据 */
     internal interface JsonObj {
         fun optString(name: String, fallback: String): String
-
         fun optLong(name: String): Long
-
         fun optLong(name: String, fallback: Long): Long
-
         fun optInt(name: String, fallback: Int): Int
-
         fun optBoolean(name: String, fallback: Boolean): Boolean
     }
 
+    /** JSONObject的JsonObj接口实现 */
     private class OrgJsonObj(
         private val obj: JSONObject,
     ) : JsonObj {
         override fun optString(name: String, fallback: String): String = obj.optString(name, fallback)
-
         override fun optLong(name: String): Long = obj.optLong(name)
-
         override fun optLong(name: String, fallback: Long): Long = obj.optLong(name, fallback)
-
         override fun optInt(name: String, fallback: Int): Int = obj.optInt(name, fallback)
-
         override fun optBoolean(name: String, fallback: Boolean): Boolean = obj.optBoolean(name, fallback)
     }
 
+    /**
+     * 获取搜索默认文本（搜索框默认显示的热门词）
+     *
+     * @return 默认搜索词，如果未设置则返回null
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun searchDefaultText(): String? {
         val keys = BiliClient.ensureWbiKeys()
         val url =
@@ -54,6 +66,13 @@ internal object SearchApi {
         return json.optJSONObject("data")?.optString("show_name")?.takeIf { it.isNotBlank() }
     }
 
+    /**
+     * 获取热门搜索词列表
+     *
+     * @param limit 返回数量限制，默认10，范围1-50
+     * @return 热门搜索词列表
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun searchHot(limit: Int = 10): List<String> {
         val keys = BiliClient.ensureWbiKeys()
         val url =
@@ -80,6 +99,12 @@ internal object SearchApi {
         }
     }
 
+    /**
+     * 获取搜索建议（根据输入前缀推荐相关关键词）
+     *
+     * @param term 搜索关键词前缀
+     * @return 搜索建议列表，输入为空时返回空列表，API失败时也返回空列表
+     */
     suspend fun searchSuggest(term: String): List<String> {
         val t = term.trim()
         if (t.isBlank()) return emptyList()
@@ -109,6 +134,15 @@ internal object SearchApi {
         }
     }
 
+    /**
+     * 搜索视频
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码，默认1
+     * @param order 排序方式，默认totalrank（综合排序）
+     * @return 视频分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun searchVideo(
         keyword: String,
         page: Int = 1,
@@ -117,6 +151,15 @@ internal object SearchApi {
         return searchVideoInner(keyword = keyword, page = page, order = order, allowRetry = true)
     }
 
+    /**
+     * 搜索影视内容
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码，默认1
+     * @param order 排序方式，默认totalrank（综合排序）
+     * @return 影视分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun searchMediaFt(
         keyword: String,
         page: Int = 1,
@@ -131,6 +174,15 @@ internal object SearchApi {
         )
     }
 
+    /**
+     * 搜索番剧
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码，默认1
+     * @param order 排序方式，默认totalrank（综合排序）
+     * @return 番剧分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun searchMediaBangumi(
         keyword: String,
         page: Int = 1,
@@ -145,6 +197,17 @@ internal object SearchApi {
         )
     }
 
+    /**
+     * 搜索影视/番剧内部实现
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码
+     * @param order 排序方式
+     * @param searchType 搜索类型（media_ft或media_bangumi）
+     * @param allowRetry 是否允许重试（用于处理-412错误）
+     * @return 番剧分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     private suspend fun searchMediaInner(
         keyword: String,
         page: Int,
@@ -192,6 +255,15 @@ internal object SearchApi {
         return BiliApi.PagedResult(items = seasons, page = p, pages = pages, total = total)
     }
 
+    /**
+     * 搜索直播间
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码，默认1
+     * @param order 排序方式，默认online（在线人数）
+     * @return 直播间分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun searchLiveRoom(
         keyword: String,
         page: Int = 1,
@@ -200,6 +272,16 @@ internal object SearchApi {
         return searchLiveRoomInner(keyword = keyword, page = page, order = order, allowRetry = true)
     }
 
+    /**
+     * 搜索直播间内部实现
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码
+     * @param order 排序方式
+     * @param allowRetry 是否允许重试（用于处理-412错误）
+     * @return 直播间分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     private suspend fun searchLiveRoomInner(
         keyword: String,
         page: Int,
@@ -245,6 +327,17 @@ internal object SearchApi {
         return BiliApi.PagedResult(items = rooms, page = p, pages = pages, total = total)
     }
 
+    /**
+     * 搜索用户
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码，默认1
+     * @param order 排序方式，默认0
+     * @param orderSort 排序方向，默认0
+     * @param userType 用户类型，默认0
+     * @return 用户分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun searchUser(
         keyword: String,
         page: Int = 1,
@@ -262,6 +355,18 @@ internal object SearchApi {
         )
     }
 
+    /**
+     * 搜索用户内部实现
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码
+     * @param order 排序方式
+     * @param orderSort 排序方向
+     * @param userType 用户类型
+     * @param allowRetry 是否允许重试（用于处理-412错误）
+     * @return 用户分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     private suspend fun searchUserInner(
         keyword: String,
         page: Int,
@@ -313,6 +418,16 @@ internal object SearchApi {
         return BiliApi.PagedResult(items = users, page = p, pages = pages, total = total)
     }
 
+    /**
+     * 搜索视频内部实现
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码
+     * @param order 排序方式
+     * @param allowRetry 是否允许重试（用于处理-412错误）
+     * @return 视频分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     private suspend fun searchVideoInner(
         keyword: String,
         page: Int,
@@ -353,6 +468,12 @@ internal object SearchApi {
         return BiliApi.PagedResult(items = cards, page = p, pages = pages, total = total)
     }
 
+    /**
+     * 解析搜索结果中的影视/番剧卡片列表
+     *
+     * @param arr 搜索结果JSON数组
+     * @return 解析后的番剧列表
+     */
     internal fun parseSearchMediaCards(arr: JSONArray): List<BangumiSeason> {
         val out = ArrayList<BangumiSeason>(arr.length())
         for (i in 0 until arr.length()) {
@@ -394,6 +515,12 @@ internal object SearchApi {
         return out
     }
 
+    /**
+     * 解析搜索结果中的直播间卡片列表
+     *
+     * @param arr 搜索结果JSON数组
+     * @return 解析后的直播间列表
+     */
     internal fun parseSearchLiveRoomCards(arr: JSONArray): List<LiveRoomCard> {
         val out = ArrayList<LiveRoomCard>(arr.length())
         for (i in 0 until arr.length()) {
@@ -428,6 +555,12 @@ internal object SearchApi {
         return out
     }
 
+    /**
+     * 解析搜索结果中的单个用户信息
+     *
+     * @param obj 用户信息JSON对象
+     * @return 解析后的用户信息，解析失败返回null
+     */
     internal fun parseSearchUser(obj: JsonObj): Following? {
         val mid = obj.optLong("mid").takeIf { it > 0 } ?: return null
         val name = stripHtmlTags(obj.optString("uname", "")).trim()
@@ -449,6 +582,12 @@ internal object SearchApi {
         )
     }
 
+    /**
+     * 解析搜索结果中的用户列表
+     *
+     * @param arr 搜索结果JSON数组
+     * @return 解析后的用户列表
+     */
     internal fun parseSearchUsers(arr: JSONArray): List<Following> {
         val out = ArrayList<Following>(arr.length())
         for (i in 0 until arr.length()) {
@@ -458,6 +597,12 @@ internal object SearchApi {
         return out
     }
 
+    /**
+     * 解析搜索结果中的单个视频卡片
+     *
+     * @param obj 视频信息JSON对象
+     * @return 解析后的视频卡片，解析失败返回null
+     */
     internal fun parseSearchVideoCard(obj: JsonObj): VideoCard? {
         val bvid = obj.optString("bvid", "").trim()
         if (bvid.isBlank()) return null
@@ -485,6 +630,12 @@ internal object SearchApi {
         )
     }
 
+    /**
+     * 解析搜索结果中的视频卡片列表
+     *
+     * @param arr 搜索结果JSON数组
+     * @return 解析后的视频列表
+     */
     internal fun parseSearchVideoCards(arr: JSONArray): List<VideoCard> {
         val out = ArrayList<VideoCard>(arr.length())
         for (i in 0 until arr.length()) {
@@ -494,11 +645,24 @@ internal object SearchApi {
         return out
     }
 
+    /**
+     * 移除HTML标签
+     *
+     * @param s 原始字符串
+     * @return 移除HTML标签后的纯文本
+     */
     private fun stripHtmlTags(s: String): String {
         if (s.indexOf('<') < 0) return s
         return s.replace(Regex("<[^>]*>"), "")
     }
 
+    /**
+     * 确保搜索所需的Cookie存在
+     *
+     * 搜索API需要buvid3等Cookie，通过访问B站首页来获取。
+     *
+     * @param force 是否强制刷新Cookie
+     */
     private suspend fun ensureSearchCookies(force: Boolean = false) {
         if (!force && !BiliClient.cookies.getCookieValue("buvid3").isNullOrBlank()) return
         runCatching { BiliClient.getBytes("https://www.bilibili.com/") }

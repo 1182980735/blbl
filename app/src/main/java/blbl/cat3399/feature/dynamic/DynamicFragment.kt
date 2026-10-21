@@ -48,10 +48,20 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
+/**
+ * 动态页面Fragment，展示关注UP主的最新视频动态
+ *
+ * 左侧显示关注列表，右侧显示选中UP主的视频动态。
+ * 实现了 [RefreshKeyHandler] 接口支持刷新键处理，[BackPressHandler] 接口支持返回键处理。
+ */
 class DynamicFragment : Fragment(), RefreshKeyHandler, BackPressHandler {
+    /** 动态流继续游标，用于分页加载 */
     private data class FeedContinuationCursor(
+        /** 选中的UP主ID */
         val selectedMid: Long,
+        /** 当前页码 */
         val page: Int,
+        /** 偏移量 */
         val offset: String?,
     )
 

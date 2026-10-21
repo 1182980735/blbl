@@ -53,39 +53,81 @@ import java.security.MessageDigest
 import java.util.Locale
 import kotlin.math.roundToLong
 
+/**
+ * B站API接口封装类
+ *
+ * 提供B站各类API的封装，包括：
+ * - 用户相关（导航、关系、空间统计）
+ * - 视频相关（播放、详情、推荐、排行）
+ * - 搜索相关（视频、番剧、直播、用户）
+ * - 直播相关（分区、推荐、房间信息、播放地址）
+ * - 历史记录相关
+ * - 收藏相关
+ * - 番剧相关
+ */
 object BiliApi {
     private const val TAG = "BiliApi"
+
+    /** 动态首页消费特性列表 */
     private const val DYNAMIC_HOST_FEED_CONSUME_FEATURES =
         "itemOpusStyle,listOnlyfans,opusBigCover,onlyfansVote,decorationCard,onlyfansAssetsV2," +
             "forwardListHidden,ugcDelete,onlyfansQaCard,commentsNewVersion,avatarAutoTheme," +
             "sunflowerStyle,cardsEnhance,eva3CardOpus,eva3CardVideo,eva3CardComment,eva3CardVote,eva3CardUser"
 
-    // Used by APP-side PGC aggregation endpoints like /pgc/page/bangumi and /pgc/page/cinema/tab.
-    // The response schema/modules may vary by build; keep this as a reasonably new default.
+    /** PGC聚合页面默认build版本 */
     private const val PGC_PAGE_BUILD_DEFAULT = 8130300
+
+    /** PGC聚合页面默认mobi_app参数 */
     private const val PGC_PAGE_MOBI_APP_DEFAULT = "android"
 
-    // https://www.bilibili.com/read/cv11815732
+    /** BV号与AV号转换相关常量 */
     private const val BV_XOR = 177451812L
     private const val BV_ADD = 8728348608L
     private val BV_TABLE = "fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF"
     private val BV_POS = intArrayOf(11, 10, 3, 8, 4, 6)
     private val BV_REGEX = Regex("BV[0-9A-Za-z]{10}")
 
+    /**
+     * 从JSON响应中提取v_voucher参数
+     *
+     * @param json API响应JSON对象
+     * @return v_voucher值，如果未找到则返回null
+     */
     private fun extractVVoucher(json: JSONObject): String? {
         val data = json.optJSONObject("data") ?: json.optJSONObject("result") ?: return null
         return data.optString("v_voucher", "").trim().takeIf { it.isNotBlank() }
     }
 
+    /**
+     * 获取Pili Web请求头，用于某些需要特殊头的API请求
+     *
+     * @param targetUrl 目标URL
+     * @param includeCookie 是否包含Cookie
+     * @return 请求头映射
+     */
     internal fun piliWebHeaders(targetUrl: String, includeCookie: Boolean = true): Map<String, String> =
         PiliWebHeaders.forUrl(targetUrl = targetUrl, includeCookie = includeCookie)
 
+    /**
+     * Gaia验证注册结果数据类
+     *
+     * @param gt Geetest验证ID
+     * @param challenge Geetest挑战值
+     * @param token 注册返回的token
+     */
     data class GaiaVgateRegister(
         val gt: String,
         val challenge: String,
         val token: String,
     )
 
+    /**
+     * 注册Gaia验证
+     *
+     * @param vVoucher 验证凭证
+     * @return 注册结果，包含gt、challenge和token
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun gaiaVgateRegister(vVoucher: String): GaiaVgateRegister {
         val csrf = BiliClient.cookies.getCookieValue("bili_jct").orEmpty()
         val url =
@@ -114,6 +156,16 @@ object BiliApi {
         return GaiaVgateRegister(gt = gt, challenge = challenge, token = token)
     }
 
+    /**
+     * 验证Gaia验证结果
+     *
+     * @param token 注册时返回的token
+     * @param geetestChallenge Geetest挑战值
+     * @param validate 用户验证结果
+     * @param seccode 安全码
+     * @return grisk_id用于后续请求
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun gaiaVgateValidate(
         token: String,
         geetestChallenge: String,
@@ -150,6 +202,15 @@ object BiliApi {
         return data.optString("grisk_id", "").trim().takeIf { it.isNotBlank() } ?: error("gaia_vgate_validate_missing_grisk_id")
     }
 
+    /**
+     * 分页结果数据类
+     *
+     * @param T 列表项类型
+     * @param items 当前页数据列表
+     * @param page 当前页码
+     * @param pages 总页数
+     * @param total 总数据量
+     */
     data class PagedResult<T>(
         val items: List<T>,
         val page: Int,
@@ -157,23 +218,56 @@ object BiliApi {
         val total: Int,
     )
 
+    /**
+     * 游标分页结果数据类
+     *
+     * @param T 列表项类型
+     * @param items 当前页数据列表
+     * @param hasNext 是否有下一页
+     * @param nextCursor 下一页游标
+     */
     data class CursorPage<T>(
         val items: List<T>,
         val hasNext: Boolean,
         val nextCursor: String?,
     )
 
+    /**
+     * 用户关系统计数据类
+     *
+     * @param following 关注数
+     * @param follower 粉丝数
+     */
     data class RelationStat(
         val following: Long,
         val follower: Long,
     )
 
+    /**
+     * UP主空间统计数据类
+     *
+     * @param archiveView 视频播放量
+     * @param articleView 文章阅读量（可为null）
+     * @param likes 获赞数
+     */
     data class SpaceUpStat(
         val archiveView: Long,
         val articleView: Long?,
         val likes: Long,
     )
 
+    /**
+     * Web弹幕设置数据类
+     *
+     * @param dmSwitch 弹幕开关
+     * @param allowScroll 允许滚动弹幕
+     * @param allowTop 允许顶部弹幕
+     * @param allowBottom 允许底部弹幕
+     * @param allowColor 允许彩色弹幕
+     * @param allowSpecial 允许特殊弹幕
+     * @param aiEnabled AI弹幕开关
+     * @param aiLevel AI弹幕等级
+     */
     data class DanmakuWebSetting(
         val dmSwitch: Boolean,
         val allowScroll: Boolean,
@@ -185,6 +279,14 @@ object BiliApi {
         val aiLevel: Int,
     )
 
+    /**
+     * Web弹幕视图数据类
+     *
+     * @param segmentTotal 弹幕分段总数
+     * @param segmentPageSizeMs 每段弹幕时间长度（毫秒）
+     * @param count 弹幕总数
+     * @param setting 弹幕设置
+     */
     data class DanmakuWebView(
         val segmentTotal: Int,
         val segmentPageSizeMs: Long,
@@ -192,17 +294,39 @@ object BiliApi {
         val setting: DanmakuWebSetting?,
     )
 
+    /**
+     * 历史记录游标数据类
+     *
+     * @param max 最大记录ID
+     * @param business 业务类型（如archive、pgc、live）
+     * @param viewAt 最后观看时间戳
+     */
     data class HistoryCursor(
         val max: Long,
         val business: String?,
         val viewAt: Long,
     )
 
+    /**
+     * 历史记录分页结果数据类
+     *
+     * @param items 历史记录列表
+     * @param cursor 游标，用于加载更多
+     */
     data class HistoryPage(
         val items: List<HistoryEntry>,
         val cursor: HistoryCursor?,
     )
 
+    /**
+     * 用户空间基本信息数据类
+     *
+     * @param mid 用户ID
+     * @param name 用户名
+     * @param faceUrl 头像URL
+     * @param sign 签名
+     * @param isFollowed 是否已关注
+     */
     data class SpaceAccInfo(
         val mid: Long,
         val name: String,
@@ -211,6 +335,15 @@ object BiliApi {
         val isFollowed: Boolean,
     )
 
+    /**
+     * 带更多标记的分页结果数据类
+     *
+     * @param T 列表项类型
+     * @param items 当前页数据列表
+     * @param page 当前页码
+     * @param hasMore 是否有更多数据
+     * @param total 总数据量
+     */
     data class HasMorePage<T>(
         val items: List<T>,
         val page: Int,
@@ -221,11 +354,29 @@ object BiliApi {
     private fun VideoCardPage<*>.toHasMorePage(): HasMorePage<VideoCard> =
         HasMorePage(items = items, page = page, hasMore = hasMore, total = total)
 
+    /**
+     * PGC关注操作结果数据类
+     *
+     * @param status 操作状态
+     * @param toast 提示信息
+     */
     data class PgcFollowActionResult(
         val status: Int?,
         val toast: String?,
     )
 
+    /**
+     * 直播间信息数据类
+     *
+     * @param roomId 房间ID
+     * @param uid 主播UID
+     * @param uname 主播名称
+     * @param faceUrl 主播头像URL
+     * @param title 直播间标题
+     * @param liveStatus 直播状态（0=未开播，1=直播中）
+     * @param areaName 子分区名称
+     * @param parentAreaName 父分区名称
+     */
     data class LiveRoomInfo(
         val roomId: Long,
         val uid: Long,
@@ -237,6 +388,14 @@ object BiliApi {
         val parentAreaName: String?,
     )
 
+    /**
+     * 直播播放地址数据类
+     *
+     * @param currentQn 当前清晰度
+     * @param acceptQn 支持的清晰度列表
+     * @param qnDesc 清晰度描述映射
+     * @param lines 播放线路列表
+     */
     data class LivePlayUrl(
         val currentQn: Int,
         val acceptQn: List<Int>,
@@ -244,32 +403,81 @@ object BiliApi {
         val lines: List<LivePlayLine>,
     )
 
+    /**
+     * 直播播放线路数据类
+     *
+     * @param order 线路序号
+     * @param url 播放地址
+     */
     data class LivePlayLine(
         val order: Int,
         val url: String,
     )
 
+    /**
+     * 直播弹幕信息数据类
+     *
+     * @param token 弹幕token
+     * @param hosts 弹幕服务器列表
+     */
     data class LiveDanmuInfo(
         val token: String,
         val hosts: List<LiveDanmuHost>,
     )
 
+    /**
+     * 直播弹幕服务器数据类
+     *
+     * @param host 服务器地址
+     * @param wssPort WSS端口
+     * @param wsPort WS端口
+     */
     data class LiveDanmuHost(
         val host: String,
         val wssPort: Int,
         val wsPort: Int,
     )
 
+    /**
+     * 获取用户导航信息（登录状态、用户信息等）
+     *
+     * @return 用户导航信息JSON对象
+     */
     suspend fun nav(): JSONObject {
         return BiliClient.getJson("https://api.bilibili.com/x/web-interface/nav")
     }
 
+    /**
+     * 获取搜索默认文本
+     *
+     * @return 默认搜索词，如果未设置则返回null
+     */
     suspend fun searchDefaultText(): String? = SearchApi.searchDefaultText()
 
+    /**
+     * 获取热门搜索词
+     *
+     * @param limit 返回数量限制，默认10
+     * @return 热门搜索词列表
+     */
     suspend fun searchHot(limit: Int = 10): List<String> = SearchApi.searchHot(limit = limit)
 
+    /**
+     * 获取搜索建议
+     *
+     * @param term 搜索关键词前缀
+     * @return 搜索建议列表
+     */
     suspend fun searchSuggest(term: String): List<String> = SearchApi.searchSuggest(term = term)
 
+    /**
+     * 搜索视频
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码，默认1
+     * @param order 排序方式，默认totalrank
+     * @return 视频分页结果
+     */
     suspend fun searchVideo(
         keyword: String,
         page: Int = 1,
@@ -278,6 +486,14 @@ object BiliApi {
         return SearchApi.searchVideo(keyword = keyword, page = page, order = order)
     }
 
+    /**
+     * 搜索影视内容
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码，默认1
+     * @param order 排序方式，默认totalrank
+     * @return 影视分页结果
+     */
     suspend fun searchMediaFt(
         keyword: String,
         page: Int = 1,
@@ -286,6 +502,14 @@ object BiliApi {
         return SearchApi.searchMediaFt(keyword = keyword, page = page, order = order)
     }
 
+    /**
+     * 搜索番剧
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码，默认1
+     * @param order 排序方式，默认totalrank
+     * @return 番剧分页结果
+     */
     suspend fun searchMediaBangumi(
         keyword: String,
         page: Int = 1,
@@ -294,6 +518,14 @@ object BiliApi {
         return SearchApi.searchMediaBangumi(keyword = keyword, page = page, order = order)
     }
 
+    /**
+     * 搜索直播间
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码，默认1
+     * @param order 排序方式，默认online（在线人数）
+     * @return 直播间分页结果
+     */
     suspend fun searchLiveRoom(
         keyword: String,
         page: Int = 1,
@@ -302,6 +534,16 @@ object BiliApi {
         return SearchApi.searchLiveRoom(keyword = keyword, page = page, order = order)
     }
 
+    /**
+     * 搜索用户
+     *
+     * @param keyword 搜索关键词
+     * @param page 页码，默认1
+     * @param order 排序方式，默认0
+     * @param orderSort 排序方向，默认0
+     * @param userType 用户类型，默认0
+     * @return 用户分页结果
+     */
     suspend fun searchUser(
         keyword: String,
         page: Int = 1,
@@ -318,6 +560,12 @@ object BiliApi {
         )
     }
 
+    /**
+     * 获取用户关系统计
+     *
+     * @param vmid 用户ID
+     * @return 关注数和粉丝数
+     */
     suspend fun relationStat(vmid: Long): RelationStat {
         val url = BiliClient.withQuery(
             "https://api.bilibili.com/x/relation/stat",
@@ -331,6 +579,13 @@ object BiliApi {
         )
     }
 
+    /**
+     * 获取UP主空间统计数据
+     *
+     * @param mid UP主ID
+     * @return 视频播放量、文章阅读量、获赞数
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun spaceUpStat(mid: Long): SpaceUpStat {
         val safeMid = mid.takeIf { it > 0 } ?: error("mid required")
         val url =
@@ -371,10 +626,32 @@ object BiliApi {
         )
     }
 
+    /**
+     * 获取直播分区列表
+     *
+     * @param force 是否强制刷新缓存
+     * @return 直播父分区列表
+     */
     suspend fun liveAreas(force: Boolean = false): List<LiveAreaParent> = LiveApi.liveAreas(force = force)
 
+    /**
+     * 获取直播推荐列表
+     *
+     * @param page 页码，默认1
+     * @return 推荐直播间列表
+     */
     suspend fun liveRecommend(page: Int = 1): List<LiveRoomCard> = LiveApi.liveRecommend(page = page)
 
+    /**
+     * 获取指定分区的直播间列表
+     *
+     * @param parentAreaId 父分区ID
+     * @param areaId 子分区ID
+     * @param page 页码，默认1
+     * @param pageSize 每页大小，默认30
+     * @param sortType 排序方式，默认online（在线人数）
+     * @return 直播间列表
+     */
     suspend fun liveAreaRooms(
         parentAreaId: Int,
         areaId: Int,
@@ -391,19 +668,61 @@ object BiliApi {
         )
     }
 
+    /**
+     * 获取关注的直播间列表
+     *
+     * @param page 页码，默认1
+     * @param pageSize 每页大小，默认10
+     * @return 关注直播间分页结果
+     */
     suspend fun liveFollowing(page: Int = 1, pageSize: Int = 10): HasMorePage<LiveRoomCard> {
         return LiveApi.liveFollowing(page = page, pageSize = pageSize)
     }
 
+    /**
+     * 获取直播间详细信息
+     *
+     * @param roomId 房间ID
+     * @return 直播间信息
+     */
     suspend fun liveRoomInfo(roomId: Long): LiveRoomInfo = LiveApi.liveRoomInfo(roomId = roomId)
 
+    /**
+     * 执行进入直播间操作（用于记录访问记录）
+     *
+     * @param roomId 房间ID
+     */
     suspend fun liveRoomEntryAction(roomId: Long) = LiveApi.liveRoomEntryAction(roomId = roomId)
 
+    /**
+     * 获取直播播放地址
+     *
+     * @param roomId 房间ID
+     * @param qn 清晰度等级
+     * @param highBitrateEnabled 是否开启高码率
+     * @return 直播播放地址信息
+     */
     suspend fun livePlayUrl(roomId: Long, qn: Int, highBitrateEnabled: Boolean): LivePlayUrl =
         LiveApi.livePlayUrl(roomId = roomId, qn = qn, highBitrateEnabled = highBitrateEnabled)
 
+    /**
+     * 获取直播弹幕服务器信息
+     *
+     * @param roomId 房间ID
+     * @return 弹幕服务器信息
+     */
     suspend fun liveDanmuInfo(roomId: Long): LiveDanmuInfo = LiveApi.liveDanmuInfo(roomId = roomId)
 
+    /**
+     * 获取历史记录（游标分页）
+     *
+     * @param max 最大记录ID，用于分页
+     * @param business 业务类型过滤（如archive、pgc、live）
+     * @param viewAt 最后观看时间戳
+     * @param ps 每页大小，默认24，范围1-30
+     * @return 历史记录分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun historyCursor(
         max: Long = 0,
         business: String? = null,
@@ -438,6 +757,12 @@ object BiliApi {
         return HistoryPage(items = items, cursor = cursor)
     }
 
+    /**
+     * 解析历史记录条目列表
+     *
+     * @param list 历史记录JSON数组
+     * @return 解析后的历史记录列表
+     */
     private fun parseHistoryEntries(list: JSONArray): List<HistoryEntry> {
         val out = ArrayList<HistoryEntry>(list.length())
         for (i in 0 until list.length()) {
@@ -557,26 +882,70 @@ object BiliApi {
         return path.substringAfterLast('/', missingDelimiterValue = "").toLongOrNull()?.takeIf { it > 0 }
     }
 
+    /**
+     * 获取稍后再看列表
+     *
+     * @return 稍后再看视频列表
+     */
     suspend fun toViewList(): List<VideoCard> = VideoApi.toViewList()
 
+    /**
+     * 添加视频到稍后再看
+     *
+     * @param bvid 视频BV号
+     * @param aid 视频AV号
+     */
     suspend fun toViewAdd(
         bvid: String? = null,
         aid: Long? = null,
     ) = VideoApi.toViewAdd(bvid = bvid, aid = aid)
 
+    /**
+     * 从稍后再看删除视频
+     *
+     * @param aid 视频AV号
+     */
     suspend fun toViewDelete(aid: Long) = VideoApi.toViewDelete(aid = aid)
 
+    /**
+     * 删除历史记录
+     *
+     * @param kid 历史记录ID
+     */
     suspend fun historyDelete(kid: String) = VideoApi.historyDelete(kid = kid)
 
+    /**
+     * 反馈不感兴趣的视频
+     *
+     * @param card 视频卡片
+     */
     suspend fun videoFeedbackDislike(card: VideoCard) = VideoApi.feedbackDislike(card = card)
 
+    /**
+     * 获取用户喜欢的视频列表
+     *
+     * @param vmid 用户ID
+     * @return 喜欢的视频列表
+     */
     suspend fun spaceLikeVideoList(vmid: Long): List<VideoCard> = VideoApi.spaceLikeVideoList(vmid = vmid)
 
+    /**
+     * 删除收藏资源
+     *
+     * @param aid 视频AV号
+     * @param mediaId 收藏夹ID
+     */
     suspend fun favResourceDelete(
         aid: Long,
         mediaId: Long,
     ) = VideoApi.favResourceDeal(rid = aid, addMediaIds = emptyList(), delMediaIds = listOf(mediaId))
 
+    /**
+     * 获取收藏夹详情信息（用于补充封面）
+     *
+     * @param mediaId 收藏夹ID
+     * @return 收藏夹信息，如果获取失败则返回null
+     */
     private suspend fun favFolderInfo(mediaId: Long): FavFolder? {
         val url = BiliClient.withQuery(
             "https://api.bilibili.com/x/v3/fav/folder/info",
@@ -594,6 +963,13 @@ object BiliApi {
         )
     }
 
+    /**
+     * 获取用户创建的收藏夹列表
+     *
+     * @param upMid 用户ID
+     * @return 收藏夹列表
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun favFolders(upMid: Long): List<FavFolder> {
         val url = BiliClient.withQuery(
             "https://api.bilibili.com/x/v3/fav/folder/created/list-all",
@@ -640,6 +1016,14 @@ object BiliApi {
         return enriched
     }
 
+    /**
+     * 带收藏状态的收藏夹数据类
+     *
+     * @param mediaId 收藏夹ID
+     * @param title 收藏夹名称
+     * @param mediaCount 收藏数量
+     * @param favState 是否已收藏指定资源
+     */
     data class FavFolderWithState(
         val mediaId: Long,
         val title: String,
@@ -647,6 +1031,14 @@ object BiliApi {
         val favState: Boolean,
     )
 
+    /**
+     * 获取用户收藏夹列表（包含指定资源的收藏状态）
+     *
+     * @param upMid 用户ID
+     * @param rid 资源ID（视频AV号）
+     * @return 收藏夹列表，包含指定资源的收藏状态
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun favFoldersWithState(upMid: Long, rid: Long): List<FavFolderWithState> {
         if (upMid <= 0L) error("fav_folders_with_state_invalid_up_mid")
         if (rid <= 0L) error("fav_folders_with_state_invalid_rid")
@@ -685,33 +1077,76 @@ object BiliApi {
         }
     }
 
+    /**
+     * 处理收藏资源（添加/删除）
+     *
+     * @param rid 资源ID（视频AV号）
+     * @param addMediaIds 要添加到的收藏夹ID列表
+     * @param delMediaIds 要删除的收藏夹ID列表
+     */
     suspend fun favResourceDeal(
         rid: Long,
         addMediaIds: List<Long>,
         delMediaIds: List<Long>,
     ) = VideoApi.favResourceDeal(rid = rid, addMediaIds = addMediaIds, delMediaIds = delMediaIds)
 
+    /**
+     * 查询视频是否已点赞
+     *
+     * @param bvid 视频BV号
+     * @param aid 视频AV号
+     * @return 是否已点赞
+     */
     suspend fun archiveHasLike(
         bvid: String? = null,
         aid: Long? = null,
     ) = VideoApi.archiveHasLike(bvid = bvid, aid = aid)
 
+    /**
+     * 查询视频投币信息
+     *
+     * @param bvid 视频BV号
+     * @param aid 视频AV号
+     * @return 投币信息
+     */
     suspend fun archiveCoins(
         bvid: String? = null,
         aid: Long? = null,
     ) = VideoApi.archiveCoins(bvid = bvid, aid = aid)
 
+    /**
+     * 查询视频是否已收藏
+     *
+     * @param bvid 视频BV号
+     * @param aid 视频AV号
+     * @return 是否已收藏
+     */
     suspend fun archiveFavoured(
         bvid: String? = null,
         aid: Long? = null,
     ) = VideoApi.archiveFavoured(bvid = bvid, aid = aid)
 
+    /**
+     * 点赞/取消点赞视频
+     *
+     * @param bvid 视频BV号
+     * @param aid 视频AV号
+     * @param like true=点赞，false=取消点赞
+     */
     suspend fun archiveLike(
         bvid: String? = null,
         aid: Long? = null,
         like: Boolean,
     ) = VideoApi.archiveLike(bvid = bvid, aid = aid, like = like)
 
+    /**
+     * 给视频投币
+     *
+     * @param bvid 视频BV号
+     * @param aid 视频AV号
+     * @param multiply 投币数量（1或2）
+     * @param selectLike 是否同时点赞
+     */
     suspend fun coinAdd(
         bvid: String? = null,
         aid: Long? = null,
@@ -719,6 +1154,15 @@ object BiliApi {
         selectLike: Boolean = false,
     ) = VideoApi.coinAdd(bvid = bvid, aid = aid, multiply = multiply, selectLike = selectLike)
 
+    /**
+     * 获取收藏夹中的视频资源列表
+     *
+     * @param mediaId 收藏夹ID
+     * @param pn 页码，默认1
+     * @param ps 每页大小，默认20，范围1-20
+     * @return 收藏视频分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun favFolderResources(
         mediaId: Long,
         pn: Int = 1,
@@ -775,6 +1219,16 @@ object BiliApi {
         return HasMorePage(items = cards, page = pn.coerceAtLeast(1), hasMore = hasMore, total = total)
     }
 
+    /**
+     * 获取用户追番列表
+     *
+     * @param vmid 用户ID
+     * @param type 类型：1=正在看，2=想看
+     * @param pn 页码，默认1
+     * @param ps 每页大小，默认15，范围1-30
+     * @return 番剧分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun bangumiFollowList(
         vmid: Long,
         type: Int,
@@ -858,6 +1312,12 @@ object BiliApi {
         return PagedResult(items = items, page = page, pages = pages, total = total)
     }
 
+    /**
+     * 获取番剧详情（通过seasonId）
+     *
+     * @param seasonId 番剧季ID
+     * @return 番剧详情
+     */
     suspend fun bangumiSeasonDetail(seasonId: Long): BangumiSeasonDetail {
         val safeSeasonId = seasonId.takeIf { it > 0L } ?: error("seasonId required")
         val url =
@@ -868,6 +1328,12 @@ object BiliApi {
         return bangumiSeasonDetailInner(url = url, seasonId = safeSeasonId, epId = null)
     }
 
+    /**
+     * 获取番剧详情（通过epId）
+     *
+     * @param epId 剧集ID
+     * @return 番剧详情
+     */
     suspend fun bangumiSeasonDetailByEpId(epId: Long): BangumiSeasonDetail {
         val safeEpId = epId.takeIf { it > 0L } ?: error("epId required")
         val url =
@@ -878,6 +1344,12 @@ object BiliApi {
         return bangumiSeasonDetailInner(url = url, seasonId = null, epId = safeEpId)
     }
 
+    /**
+     * 关注番剧
+     *
+     * @param seasonId 番剧季ID
+     * @return 关注操作结果
+     */
     suspend fun pgcFollowAdd(seasonId: Long): PgcFollowActionResult {
         return pgcFollowAction(
             url = "https://api.bilibili.com/pgc/web/follow/add",
@@ -885,6 +1357,12 @@ object BiliApi {
         )
     }
 
+    /**
+     * 取消关注番剧
+     *
+     * @param seasonId 番剧季ID
+     * @return 取消关注操作结果
+     */
     suspend fun pgcFollowDel(seasonId: Long): PgcFollowActionResult {
         return pgcFollowAction(
             url = "https://api.bilibili.com/pgc/web/follow/del",
@@ -892,6 +1370,14 @@ object BiliApi {
         )
     }
 
+    /**
+     * 执行PGC关注/取消关注操作
+     *
+     * @param url 操作API地址
+     * @param seasonId 番剧季ID
+     * @return 操作结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     private suspend fun pgcFollowAction(
         url: String,
         seasonId: Long,

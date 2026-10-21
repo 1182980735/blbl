@@ -16,8 +16,20 @@ import org.json.JSONObject
 import java.util.Locale
 import java.util.zip.CRC32
 
+/**
+     * 视频相关API内部封装类
+     *
+     * 提供视频操作相关的API封装，包括：
+     * - 稍后再看管理
+     * - 历史记录管理
+     * - 视频互动（点赞、投币、收藏）
+     * - 弹幕相关（获取弹幕、弹幕过滤规则）
+     * - 评论获取
+     */
 internal object VideoApi {
     private const val TAG = "BiliApi"
+
+    /** 不感兴趣反馈相关常量 */
     private const val FEEDBACK_DISLIKE_URL = "https://api.bilibili.com/x/web-interface/feedback/dislike"
     private const val FEEDBACK_DISLIKE_APP_ID = "100"
     private const val FEEDBACK_DISLIKE_PLATFORM = "5"
@@ -26,16 +38,19 @@ internal object VideoApi {
     private const val FEEDBACK_DISLIKE_PAGE = "1"
     private const val FEEDBACK_DISLIKE_DEFAULT_REASON_ID = 1
 
-    private const val DM_FILTER_USER_CACHE_TTL_MS: Long = 10L * 60 * 1000 // 10min
+    /** 弹幕过滤器缓存相关常量 */
+    private const val DM_FILTER_USER_CACHE_TTL_MS: Long = 10L * 60 * 1000
     private val MID_HASH_REGEX = Regex("^[0-9a-fA-F]{1,8}$")
     private val MID_REGEX = Regex("^\\d{1,20}$")
 
+    /** 弹幕过滤器缓存数据类 */
     private data class DmFilterUserCache(
         val mid: Long,
         val fetchedAtMs: Long,
         val filter: DanmakuUserFilter,
     )
 
+    /** 不感兴趣反馈负载数据类 */
     private data class FeedbackDislikePayload(
         val aid: Long,
         val ownerMid: Long,
@@ -43,42 +58,45 @@ internal object VideoApi {
         val reasonId: Int,
     )
 
+    /** 弹幕过滤器缓存实例 */
     @Volatile
     private var dmFilterUserCache: DmFilterUserCache? = null
 
+    /**
+     * JSON对象抽象接口，用于统一解析不同来源的JSON数据
+     */
     internal interface JsonObj {
         fun optString(name: String, fallback: String): String
-
         fun optLong(name: String): Long
-
         fun optLong(name: String, fallback: Long): Long
-
         fun optInt(name: String, fallback: Int): Int
-
         fun optBoolean(name: String, fallback: Boolean): Boolean
-
         fun optJSONObject(name: String): JsonObj?
     }
 
+    /**
+     * JSONObject的JsonObj接口实现
+     */
     private class OrgJsonObj(
         private val obj: JSONObject,
     ) : JsonObj {
         override fun optString(name: String, fallback: String): String = obj.optString(name, fallback)
-
         override fun optLong(name: String): Long = obj.optLong(name)
-
         override fun optLong(name: String, fallback: Long): Long = obj.optLong(name, fallback)
-
         override fun optInt(name: String, fallback: Int): Int = obj.optInt(name, fallback)
-
         override fun optBoolean(name: String, fallback: Boolean): Boolean = obj.optBoolean(name, fallback)
-
         override fun optJSONObject(name: String): JsonObj? {
             val nested = obj.optJSONObject(name) ?: return null
             return OrgJsonObj(nested)
         }
     }
 
+    /**
+     * 获取稍后再看列表
+     *
+     * @return 稍后再看视频列表
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun toViewList(): List<VideoCard> {
         val url = "https://api.bilibili.com/x/v2/history/toview"
         val json = BiliClient.getJson(url)
@@ -91,6 +109,13 @@ internal object VideoApi {
         return withContext(Dispatchers.Default) { parseVideoCards(list) }
     }
 
+    /**
+     * 添加视频到稍后再看
+     *
+     * @param bvid 视频BV号
+     * @param aid 视频AV号
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun toViewAdd(
         bvid: String? = null,
         aid: Long? = null,
@@ -122,6 +147,12 @@ internal object VideoApi {
         }
     }
 
+    /**
+     * 从稍后再看删除视频
+     *
+     * @param aid 视频AV号
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun toViewDelete(aid: Long) {
         val safeAid = aid.takeIf { it > 0L } ?: throw BiliApiException(apiCode = -400, apiMessage = "missing_video_id")
         val csrf = BiliClient.cookies.getCookieValue("bili_jct").orEmpty().trim()
@@ -146,6 +177,12 @@ internal object VideoApi {
         }
     }
 
+    /**
+     * 删除历史记录
+     *
+     * @param kid 历史记录ID
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun historyDelete(kid: String) {
         val safeKid = kid.trim().takeIf { it.isNotBlank() } ?: throw BiliApiException(apiCode = -400, apiMessage = "missing_history_kid")
         val csrf = BiliClient.cookies.getCookieValue("bili_jct").orEmpty().trim()
@@ -592,6 +629,13 @@ internal object VideoApi {
         }
     }
 
+    /**
+     * 获取弹幕分段数据
+     *
+     * @param cid 弹幕ID（视频分P的CID）
+     * @param segmentIndex 分段索引
+     * @return 弹幕列表
+     */
     suspend fun dmSeg(cid: Long, segmentIndex: Int): List<Danmaku> {
         try {
             return requestWithAnonymousFallback(
@@ -606,6 +650,13 @@ internal object VideoApi {
         }
     }
 
+    /**
+     * 获取弹幕Web视图信息（包含分段总数、弹幕设置等）
+     *
+     * @param cid 弹幕ID
+     * @param aid 视频AV号（可选）
+     * @return 弹幕Web视图信息
+     */
     suspend fun dmWebView(cid: Long, aid: Long? = null): BiliApi.DanmakuWebView {
         return requestWithAnonymousFallback(
             requestName = "dmWebView",
@@ -615,6 +666,14 @@ internal object VideoApi {
         )
     }
 
+    /**
+     * 请求弹幕分段数据
+     *
+     * @param cid 弹幕ID
+     * @param segmentIndex 分段索引
+     * @param includeCookie 是否包含Cookie
+     * @return 弹幕列表
+     */
     private suspend fun requestDmSeg(
         cid: Long,
         segmentIndex: Int,
@@ -715,8 +774,15 @@ internal object VideoApi {
         )
     }
 
+    /**
+     * 获取弹幕用户过滤规则
+     *
+     * 需要登录（SESSDATA）才能获取。支持缓存机制，默认缓存10分钟。
+     *
+     * @param forceRefresh 是否强制刷新缓存
+     * @return 弹幕用户过滤器，包含关键词、正则表达式、屏蔽用户哈希列表
+     */
     suspend fun dmFilterUser(forceRefresh: Boolean = false): DanmakuUserFilter {
-        // Requires login (SESSDATA).
         val mid =
             BiliClient.cookies.getCookieValue("DedeUserID")
                 ?.trim()
@@ -737,7 +803,6 @@ internal object VideoApi {
             dmFilterUserCache = DmFilterUserCache(mid = mid, fetchedAtMs = now, filter = fetched)
             return fetched
         } catch (t: Throwable) {
-            // -101: not logged in (cookie may be stale); do not apply stale filters.
             if ((t as? BiliApiException)?.apiCode == -101) {
                 dmFilterUserCache = null
                 return DanmakuUserFilter.EMPTY
@@ -747,6 +812,12 @@ internal object VideoApi {
         }
     }
 
+    /**
+     * 请求弹幕用户过滤规则（内部实现）
+     *
+     * @return 弹幕用户过滤器
+     * @throws BiliApiException API调用失败时抛出
+     */
     private suspend fun fetchDmFilterUser(): DanmakuUserFilter {
         val url = "https://api.bilibili.com/x/dm/filter/user"
         val json =
@@ -783,7 +854,6 @@ internal object VideoApi {
 
             when (type) {
                 0 -> keywords.add(raw)
-
                 1 -> {
                     val r = normalizeRegexRule(raw)
                     if (r == null) {
@@ -792,7 +862,6 @@ internal object VideoApi {
                     }
                     regexes.add(r)
                 }
-
                 2 -> {
                     normalizeMidHashRule(raw)?.let { blockedMidHashes.add(it) }
                 }
@@ -806,20 +875,35 @@ internal object VideoApi {
         )
     }
 
+    /**
+     * 规范化用户ID哈希规则
+     *
+     * 将用户输入的mid或mid哈希转换为标准格式的8位十六进制字符串。
+     * B站通常使用CRC32(mid)的十六进制字符串作为用户ID哈希。
+     *
+     * @param raw 原始输入字符串
+     * @return 规范化后的8位十六进制用户ID哈希，无效输入返回null
+     */
     internal fun normalizeMidHashRule(raw: String): String? {
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return null
         if (MID_REGEX.matches(trimmed)) {
             val mid = trimmed.toLongOrNull()?.takeIf { it > 0L } ?: return null
-            // For type=2 rules, Bilibili usually stores CRC32(mid) as a hex string.
-            // Some values may lose leading zeros, resulting in < 8 chars (e.g. "dc0589").
-            // If the server ever returns a numeric MID here, it should be much longer than 8 chars.
             return if (trimmed.length > 8) midHashOfMid(mid) else trimmed.lowercase(Locale.US).padStart(8, '0')
         }
         if (MID_HASH_REGEX.matches(trimmed)) return trimmed.lowercase(Locale.US).padStart(8, '0')
         return null
     }
 
+    /**
+     * 规范化正则表达式规则
+     *
+     * 解析B站格式的正则表达式规则（通常为"/pattern/"或"/pattern/im"形式），
+     * 转换为Kotlin的Regex对象。
+     *
+     * @param raw 原始正则表达式字符串
+     * @return 规范化后的Regex对象，无效输入返回null
+     */
     internal fun normalizeRegexRule(raw: String): Regex? {
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return null
@@ -837,13 +921,24 @@ internal object VideoApi {
         }.getOrNull()
     }
 
+    /**
+     * 正则表达式字面量数据类
+     */
     private data class RegexLiteral(
         val pattern: String,
         val options: Set<RegexOption>,
     )
 
+    /**
+     * 解析正则表达式字面量
+     *
+     * 解析B站格式的正则表达式规则，支持"/pattern/"和"/pattern/flags"两种格式。
+     * 支持的flags：i(忽略大小写), m(多行模式), s(点号匹配所有字符)。
+     *
+     * @param raw 原始正则表达式字符串
+     * @return 解析后的RegexLiteral，无效格式返回null
+     */
     private fun parseRegexLiteral(raw: String): RegexLiteral? {
-        // Bilibili web regex rules are usually in the form "/pattern/" (optionally with flags: "/pattern/im").
         if (!raw.startsWith("/")) return null
         val closingSlashIndex = findLastUnescapedSlash(raw) ?: return null
         if (closingSlashIndex <= 0) return null
@@ -868,6 +963,14 @@ internal object VideoApi {
         return RegexLiteral(pattern = pattern, options = options)
     }
 
+    /**
+     * 查找最后一个未转义的斜杠
+     *
+     * 在正则表达式字符串中查找最后一个未被反斜杠转义的斜杠位置。
+     *
+     * @param raw 原始字符串
+     * @return 最后一个未转义斜杠的索引，未找到返回null
+     */
     private fun findLastUnescapedSlash(raw: String): Int? {
         for (i in raw.length - 1 downTo 1) {
             if (raw[i] != '/') continue
@@ -882,6 +985,14 @@ internal object VideoApi {
         return null
     }
 
+    /**
+     * 计算用户ID的哈希值
+     *
+     * 使用CRC32算法计算用户ID的哈希值，返回8位十六进制字符串。
+     *
+     * @param mid 用户ID
+     * @return 8位十六进制哈希值
+     */
     private fun midHashOfMid(mid: Long): String {
         val crc = CRC32()
         crc.update(mid.toString().toByteArray(Charsets.UTF_8))

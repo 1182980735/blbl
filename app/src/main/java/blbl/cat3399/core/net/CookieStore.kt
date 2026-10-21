@@ -11,18 +11,29 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * Cookie存储管理器，实现OkHttp的CookieJar接口
+ *
+ * 负责管理网络请求的Cookie，支持持久化到磁盘和从磁盘加载
+ */
 class CookieStore(
     context: Context,
 ) : CookieJar {
+    /** SharedPreferences实例，用于持久化Cookie */
     private val prefs: SharedPreferences =
         context.getSharedPreferences("blbl_cookie_store", Context.MODE_PRIVATE)
 
+    /** Cookie存储，以域名作为key */
     private val store: ConcurrentHashMap<String, MutableList<Cookie>> = ConcurrentHashMap()
 
     init {
+        // 初始化时从磁盘加载Cookie
         loadFromDisk()
     }
 
+    /**
+     * 从HTTP响应中保存Cookie
+     */
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
         if (cookies.isEmpty()) return
         for (cookie in cookies) {
@@ -36,6 +47,9 @@ class CookieStore(
         AppLog.d("CookieStore", "saveFromResponse host=${url.host} +${cookies.size}")
     }
 
+    /**
+     * 为HTTP请求加载Cookie
+     */
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
         val now = System.currentTimeMillis()
         val list = store.values.flatten().filter { it.expiresAt >= now && it.matches(url) }
@@ -43,11 +57,17 @@ class CookieStore(
         return list
     }
 
+    /**
+     * 获取指定URL的Cookie头字符串
+     */
     fun cookieHeaderFor(url: String): String? {
         val httpUrl = runCatching { url.toHttpUrl() }.getOrNull() ?: return null
         return cookieHeaderFor(httpUrl)
     }
 
+    /**
+     * 获取指定URL的Cookie头字符串
+     */
     fun cookieHeaderFor(url: HttpUrl): String? {
         val cookies = loadForRequest(url).toMutableList()
         if (cookies.isEmpty()) return null
@@ -58,21 +78,33 @@ class CookieStore(
         return cookies.joinToString("; ") { "${it.name}=${it.value}" }
     }
 
+    /**
+     * 检查是否存在SESSDATA（B站登录会话标识）
+     */
     fun hasSessData(): Boolean {
         val now = System.currentTimeMillis()
         return store.values.flatten().any { it.name == "SESSDATA" && it.expiresAt >= now }
     }
 
+    /**
+     * 获取指定名称的Cookie值
+     */
     fun getCookieValue(name: String): String? {
         val now = System.currentTimeMillis()
         return store.values.flatten().firstOrNull { it.name == name && it.expiresAt >= now }?.value
     }
 
+    /**
+     * 获取指定名称的Cookie对象
+     */
     fun getCookie(name: String): Cookie? {
         val now = System.currentTimeMillis()
         return store.values.flatten().firstOrNull { it.name == name && it.expiresAt >= now }
     }
 
+    /**
+     * 更新或插入单个Cookie
+     */
     fun upsert(cookie: Cookie) {
         val key = cookie.domain
         val list = (store[key] ?: mutableListOf()).toMutableList()
@@ -82,6 +114,9 @@ class CookieStore(
         persistToDisk()
     }
 
+    /**
+     * 更新或插入多个Cookie
+     */
     fun upsertAll(cookies: List<Cookie>) {
         if (cookies.isEmpty()) return
         for (cookie in cookies) {
@@ -94,6 +129,9 @@ class CookieStore(
         persistToDisk()
     }
 
+    /**
+     * 清除所有Cookie
+     */
     fun clearAll() {
         store.clear()
         prefs.edit().clear().apply()

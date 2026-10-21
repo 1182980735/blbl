@@ -17,6 +17,11 @@ import blbl.cat3399.ui.BackPressHandler
 import blbl.cat3399.ui.RefreshKeyHandler
 import blbl.cat3399.ui.SidebarFocusHost
 
+/**
+ * 搜索页面Fragment，负责搜索功能的UI展示和交互处理
+ *
+ * 实现了 [BackPressHandler] 和 [RefreshKeyHandler] 接口，支持返回键处理和刷新键处理
+ */
 class SearchFragment : Fragment(), BackPressHandler, RefreshKeyHandler {
     private var _binding: FragmentSearchBinding? = null
     private val binding get() = _binding!!

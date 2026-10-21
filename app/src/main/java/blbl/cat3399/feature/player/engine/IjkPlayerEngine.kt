@@ -18,29 +18,63 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArraySet
 
+/**
+ * 基于IjkPlayer的播放器引擎实现
+ */
 internal class IjkPlayerEngine(
     context: Context,
 ) : BlblPlayerEngine {
     private val appContext: Context = context.applicationContext
+
+    /** 播放监听器集合 */
     private val listeners: MutableSet<BlblPlayerEngine.Listener> = CopyOnWriteArraySet()
 
+    /** IjkMediaPlayer实例 */
     private var ijk: IjkMediaPlayer? = null
+
+    /** 是否已准备好 */
     private var prepared: Boolean = false
+
+    /** 是否正在缓冲 */
     private var buffering: Boolean = false
+
+    /** 是否正在准备中 */
     private var preparing: Boolean = false
+
+    /** 是否已请求准备 */
     private var prepareRequested: Boolean = false
+
+    /** 待处理的seek位置 */
     private var pendingSeekMs: Long? = null
+
+    /** 可见的seek位置（用于UI显示） */
     private var visibleSeekPositionMs: Long? = null
+
+    /** seek开始时间 */
     private var visibleSeekStartedAtMs: Long = 0L
+
+    /** 是否在首帧渲染后清除可见seek位置 */
     private var visibleSeekClearsOnFirstFrame: Boolean = false
 
+    /** 内部播放状态 */
     private var playbackStateInternal: Int = Player.STATE_IDLE
+
+    /** 是否准备好后自动播放 */
     private var playWhenReadyInternal: Boolean = false
+
+    /** 循环播放模式 */
     private var repeatModeInternal: Int = Player.REPEAT_MODE_OFF
+
+    /** 播放速度 */
     private var playbackSpeedInternal: Float = 1.0f
+
+    /** 视频渲染表面 */
     private var videoSurface: Surface? = null
 
+    /** 当前播放源 */
     private var source: PlaybackSource? = null
+
+    /** 原生HTTP事件计数 */
     private var nativeHttpEventCount: Int = 0
 
     override val kind: PlayerEngineKind = PlayerEngineKind.IjkPlayer
@@ -76,15 +110,15 @@ internal class IjkPlayerEngine(
     override val bufferedPosition: Long
         get() {
             val p = ijk ?: return 0L
+            // 如果有可见的seek位置，优先返回该位置
             visibleSeekPositionOrNull()?.let { seekPosition ->
                 return duration.takeIf { it > 0L }?.let { seekPosition.coerceIn(0L, it) } ?: seekPosition
             }
             val pos = p.currentPosition.coerceAtLeast(0L)
             val vCache = p.videoCachedDuration.coerceAtLeast(0L)
             val aCache = p.audioCachedDuration.coerceAtLeast(0L)
-            // For DASH (separate A/V), the truly playable buffered window is usually bounded by the slower track.
-            // Keep this estimate conservative so diagnostics reflect the real playable window instead of an
-            // optimistic union of the two tracks.
+            // 对于DASH（音视频分离），真正可播放的缓冲窗口通常受较慢轨道的限制
+            // 保持保守估计，使诊断反映真实的可播放窗口而非两个轨道的乐观联合
             val cachedForwardMs =
                 when {
                     vCache > 0L && aCache > 0L -> minOf(vCache, aCache)

@@ -11,6 +11,13 @@ import java.net.UnknownHostException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+/**
+ * 将OkHttp的Call转换为挂起函数
+ *
+ * 使用协程包装异步回调，使HTTP请求可以在协程中以同步方式编写
+ *
+ * @return HTTP响应
+ */
 suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
     cont.invokeOnCancellation {
         runCatching { cancel() }
@@ -26,6 +33,15 @@ suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
     })
 }
 
+/**
+ * 创建仅支持IPv4的DNS解析器
+ *
+ * 当启用IPv4-only模式时，会过滤掉IPv6地址，只返回IPv4地址
+ * 这在某些网络环境下可以避免IPv6连接问题
+ *
+ * @param ipv4OnlyEnabled 一个返回布尔值的函数，用于判断是否启用IPv4-only模式
+ * @return 自定义的DNS解析器
+ */
 fun ipv4OnlyDns(ipv4OnlyEnabled: () -> Boolean): Dns =
     object : Dns {
         override fun lookup(hostname: String): List<InetAddress> {
