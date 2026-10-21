@@ -3629,11 +3629,13 @@ class PlayerActivity : BaseActivity() {
         runWithDownloadPermissions { startVideoDownloadInternal(qn) }
     }
 
-    /** 批量下载当前播放列表（多 P / 合集）里的全部视频。 */
-    internal fun startBatchVideoDownload(qn: Int) {
-        val items = pageListItems
-        if (items.size <= 1) {
-            AppToast.show(this, "当前没有可批量下载的播放列表")
+    /** 批量下载播放列表（多 P / 合集）中指定的分 P。 */
+    internal fun startBatchVideoDownload(
+        qn: Int,
+        items: List<PlayerPlaylistItem> = pageListItems,
+    ) {
+        if (items.isEmpty()) {
+            AppToast.show(this, "没有可下载的分 P")
             return
         }
         runWithDownloadPermissions { startBatchVideoDownloadInternal(qn, items) }

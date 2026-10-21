@@ -4,10 +4,12 @@ package blbl.cat3399.feature.player
 
 import android.content.Intent
 import android.util.TypedValue
+import android.view.LayoutInflater
 import android.view.View
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.SubtitleView
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -17,6 +19,10 @@ import blbl.cat3399.core.prefs.AppPrefs
 import blbl.cat3399.core.prefs.PlayerPlaybackModes
 import blbl.cat3399.core.ui.AppToast
 import blbl.cat3399.core.ui.popup.AppPopup
+import blbl.cat3399.core.ui.popup.PopupAction
+import blbl.cat3399.core.ui.popup.PopupActionRole
+import blbl.cat3399.core.ui.popup.PopupHandle
+import blbl.cat3399.databinding.ViewDownloadSelectListBinding
 import blbl.cat3399.feature.player.danmaku.DanmakuFontWeight
 import blbl.cat3399.feature.player.danmaku.DanmakuLaneDensity
 import blbl.cat3399.feature.player.danmaku.DanmakuSessionSettings
@@ -333,7 +339,7 @@ internal fun PlayerActivity.handleSettingsItemClick(item: PlayerSettingsAdapter.
     when (item.key) {
         PlayerSettingKeys.PLAYER_ENGINE -> showPlayerEngineDialog()
         PlayerSettingKeys.DOWNLOAD_VIDEO -> showDownloadResolutionDialog()
-        PlayerSettingKeys.DOWNLOAD_ALL -> showDownloadResolutionDialog(batch = true)
+        PlayerSettingKeys.DOWNLOAD_ALL -> showDownloadSelectionDialog()
         PlayerSettingKeys.RESOLUTION -> showResolutionDialog()
         PlayerSettingKeys.AUDIO_TRACK -> showAudioDialog()
         PlayerSettingKeys.CODEC -> showCodecDialog()
@@ -732,7 +738,10 @@ internal fun PlayerActivity.showResolutionDialog() {
     ) { qn -> applyResolutionSetting(qn) }
 }
 
-internal fun PlayerActivity.showDownloadResolutionDialog(batch: Boolean = false) {
+internal fun PlayerActivity.showDownloadResolutionDialog(
+    batch: Boolean = false,
+    batchItems: List<PlayerPlaylistItem>? = null,
+) {
     val available = lastAvailableQns.filter { it > 0 }.distinct()
     if (available.isEmpty()) {
         AppToast.show(this, "当前视频还没有可下载的清晰度，请等待视频加载完成")
@@ -748,8 +757,47 @@ internal fun PlayerActivity.showDownloadResolutionDialog(batch: Boolean = false)
         checkedIndex = currentIndex,
         label = { qn -> qnLabel(qn) },
     ) { qn ->
-        if (batch) startBatchVideoDownload(qn) else startVideoDownload(qn)
+        if (batch) startBatchVideoDownload(qn, batchItems ?: pageListItems) else startVideoDownload(qn)
     }
+}
+
+/** 批量下载：先勾选要下载的分 P，再选清晰度。 */
+internal fun PlayerActivity.showDownloadSelectionDialog() {
+    val items = pageListItems
+    if (items.size <= 1) {
+        AppToast.show(this, "当前没有可批量下载的播放列表")
+        return
+    }
+    val adapter = DownloadSelectionAdapter(items, BooleanArray(items.size) { true })
+    var handle: PopupHandle? = null
+    handle =
+        AppPopup.custom(
+            context = this,
+            title = "选择要下载的分 P",
+            cancelable = true,
+            actions =
+                listOf(
+                    PopupAction(role = PopupActionRole.NEGATIVE, text = "取消"),
+                    PopupAction(role = PopupActionRole.NEUTRAL, text = "全选/全不选", dismissOnClick = false) {
+                        adapter.selectAll(!adapter.allSelected())
+                    },
+                    PopupAction(role = PopupActionRole.POSITIVE, text = "下一步：选清晰度") {
+                        val picked = adapter.selectedItems()
+                        if (picked.isEmpty()) {
+                            AppToast.show(this, "请至少选择一个分 P")
+                        } else {
+                            handle?.dismiss()
+                            showDownloadResolutionDialog(batch = true, batchItems = picked)
+                        }
+                    },
+                ),
+            preferredActionRole = PopupActionRole.POSITIVE,
+        ) { dialogContext ->
+            val binding = ViewDownloadSelectListBinding.inflate(LayoutInflater.from(dialogContext))
+            binding.recyclerSelect.layoutManager = LinearLayoutManager(dialogContext)
+            binding.recyclerSelect.adapter = adapter
+            binding.root
+        }
 }
 
 internal fun PlayerActivity.showAudioDialog() {
