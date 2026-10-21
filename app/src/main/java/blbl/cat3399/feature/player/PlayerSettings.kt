@@ -63,6 +63,8 @@ internal object PlayerSettingKeys {
     const val DEBUG_INFO = "debug_info"
     const val PERSISTENT_BOTTOM_PROGRESS = "persistent_bottom_progress"
     const val PERSISTENT_CLOCK = "persistent_clock"
+    const val DOWNLOAD_VIDEO = "download_video"
+    const val DOWNLOAD_ALL = "download_all"
 }
 
 internal enum class PlayerSettingsMenu {
@@ -303,6 +305,8 @@ internal fun PlayerActivity.applyDanmakuEnabledSetting(enabled: Boolean) {
 internal fun PlayerActivity.handleSettingsItemClick(item: PlayerSettingsAdapter.SettingItem) {
     when (item.key) {
         PlayerSettingKeys.PLAYER_ENGINE -> showPlayerEngineDialog()
+        PlayerSettingKeys.DOWNLOAD_VIDEO -> showDownloadResolutionDialog()
+        PlayerSettingKeys.DOWNLOAD_ALL -> showDownloadResolutionDialog(batch = true)
         PlayerSettingKeys.RESOLUTION -> showResolutionDialog()
         PlayerSettingKeys.AUDIO_TRACK -> showAudioDialog()
         PlayerSettingKeys.CODEC -> showCodecDialog()
@@ -506,6 +510,10 @@ private fun PlayerActivity.buildRootSettingsItems(
             BiliClient.prefs.playerPersistentClockEnabled.switchText(),
         ),
         settingItem(PlayerSettingKeys.PLAYER_ENGINE, "播放器内核", playerEngineSubtitle()),
+        settingItem(PlayerSettingKeys.DOWNLOAD_VIDEO, "下载视频", "保存到 Download/blbl"),
+        pageListItems.takeIf { it.size > 1 }?.let { items ->
+            settingItem(PlayerSettingKeys.DOWNLOAD_ALL, "下载全部 (${items.size} 个)", "保存到 Download/blbl")
+        },
         settingItem(PlayerSettingKeys.DEBUG_INFO, "调试信息", session.debugEnabled.switchText()),
     )
 }
@@ -695,6 +703,26 @@ internal fun PlayerActivity.showResolutionDialog() {
             if (available.contains(qn)) "${text}（可用）" else text
         },
     ) { qn -> applyResolutionSetting(qn) }
+}
+
+internal fun PlayerActivity.showDownloadResolutionDialog(batch: Boolean = false) {
+    val available = lastAvailableQns.filter { it > 0 }.distinct()
+    if (available.isEmpty()) {
+        AppToast.show(this, "当前视频还没有可下载的清晰度，请等待视频加载完成")
+        return
+    }
+    // 高清晰度排在前面，方便遥控器/触摸快速选择。
+    val sorted = available.sortedByDescending { it }
+    val currentQn = selectedResolutionQn()
+    val currentIndex = sorted.indexOfFirst { it == currentQn }.takeIf { it >= 0 } ?: 0
+    showSettingsChoiceDialog(
+        title = if (batch) "下载全部清晰度" else "下载清晰度",
+        options = sorted,
+        checkedIndex = currentIndex,
+        label = { qn -> qnLabel(qn) },
+    ) { qn ->
+        if (batch) startBatchVideoDownload(qn) else startVideoDownload(qn)
+    }
 }
 
 internal fun PlayerActivity.showAudioDialog() {

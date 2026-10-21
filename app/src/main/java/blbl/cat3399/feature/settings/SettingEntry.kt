@@ -16,6 +16,7 @@ enum class SettingId(
     Ipv4OnlyEnabled("ipv4_only_enabled"),
     GaiaVgate("gaia_vgate"),
     ClearCache("clear_cache"),
+    DownloadRecords("download_records"),
     ConfigTransfer("config_transfer"),
     ClearLogin("clear_login"),
 

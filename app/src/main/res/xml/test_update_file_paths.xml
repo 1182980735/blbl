@@ -3,5 +3,9 @@
     <cache-path
         name="test_update_cache"
         path="test_update/" />
+    <!-- 下载记录页打开已保存的视频（旧系统无 MediaStore Uri 时使用）。 -->
+    <external-path
+        name="blbl_downloads"
+        path="Download/blbl/" />
 </paths>
 

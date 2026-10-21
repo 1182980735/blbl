@@ -2,11 +2,14 @@
 
 package blbl.cat3399.feature.player
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.app.Activity
 import android.app.Application
 import android.graphics.SurfaceTexture
+import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
@@ -21,6 +24,7 @@ import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
 import android.widget.FrameLayout
 import android.widget.SeekBar
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -75,6 +79,7 @@ import blbl.cat3399.core.ui.DoubleBackToExitHandler
 import blbl.cat3399.core.ui.FocusReturn
 import blbl.cat3399.core.ui.FocusTreeUtils
 import blbl.cat3399.core.ui.Immersive
+import blbl.cat3399.core.ui.popup.AppPopup
 import blbl.cat3399.core.ui.popup.PopupHost
 import blbl.cat3399.core.util.Format as BlblFormat
 import blbl.cat3399.feature.my.BangumiDetailActivity
@@ -106,6 +111,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.lang.ref.WeakReference
 import java.util.Locale
 import kotlin.math.abs
@@ -300,6 +306,24 @@ class PlayerActivity : BaseActivity() {
     internal var subtitleLoadJob: Job? = null
     internal var lastAvailableQns: List<Int> = emptyList()
     internal var lastAvailableAudioIds: List<Int> = emptyList()
+    private var pendingDownloadAction: (() -> Unit)? = null
+    private val downloadStoragePermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            val action = pendingDownloadAction
+            pendingDownloadAction = null
+            if (!granted) {
+                AppToast.show(this, "需要存储权限才能保存到 Download 目录")
+            } else {
+                action?.invoke()
+            }
+        }
+    private val downloadNotificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            // 无论是否授予通知权限都继续：没有通知权限时前台服务仍会执行，只是通知不可见。
+            val action = pendingDownloadAction
+            pendingDownloadAction = null
+            action?.invoke()
+        }
     private var danmakuSegmentSizeMs: Int = DANMAKU_DEFAULT_SEGMENT_MS
     private var danmakuSegmentTotal: Int = 0
     internal var danmakuShield: DanmakuShield? = null
@@ -3467,6 +3491,196 @@ class PlayerActivity : BaseActivity() {
                 ?: session.targetAudioId.takeIf { it > 0 }
                 ?: session.preferAudioId
         return audioLabel(id)
+    }
+
+    /** 从播放器侧栏发起单集下载：权限就绪后把任务交给前台服务。 */
+    internal fun startVideoDownload(qn: Int) {
+        if (currentBvid.isBlank() || currentCid <= 0L) {
+            AppToast.show(this, "当前没有可下载的视频")
+            return
+        }
+        runWithDownloadPermissions { startVideoDownloadInternal(qn) }
+    }
+
+    /** 批量下载当前播放列表（多 P / 合集）里的全部视频。 */
+    internal fun startBatchVideoDownload(qn: Int) {
+        val items = pageListItems
+        if (items.size <= 1) {
+            AppToast.show(this, "当前没有可批量下载的播放列表")
+            return
+        }
+        runWithDownloadPermissions { startBatchVideoDownloadInternal(qn, items) }
+    }
+
+    private fun runWithDownloadPermissions(action: () -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingDownloadAction = { runWithStoragePermission(action) }
+            downloadNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
+        }
+        runWithStoragePermission(action)
+    }
+
+    private fun runWithStoragePermission(action: () -> Unit) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingDownloadAction = action
+            downloadStoragePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            return
+        }
+        action()
+    }
+
+    private fun startVideoDownloadInternal(qn: Int) {
+        val bvid = currentBvid
+        val cid = currentCid
+        val aid = currentAid
+        val epId = currentEpId
+        val title = currentMainTitle?.trim().orEmpty().ifBlank { "blbl_video" }
+        var job: Job? = null
+        val popup =
+            AppPopup.progress(
+                context = this,
+                title = "下载视频",
+                status = "获取播放地址…",
+                negativeText = "取消",
+                cancelable = false,
+                onNegative = { job?.cancel() },
+            )
+        job =
+            lifecycleScope.launch {
+                try {
+                    val request =
+                        buildDownloadRequest(
+                            qn = qn,
+                            bvid = bvid,
+                            aid = aid,
+                            cid = cid,
+                            epId = epId,
+                            title = title,
+                        )
+                    DownloadService.enqueue(this@PlayerActivity, request)
+                    popup?.dismiss()
+                    AppToast.showLong(this@PlayerActivity, "已加入下载队列，退出播放器后仍会继续")
+                } catch (e: CancellationException) {
+                    popup?.dismiss()
+                } catch (t: Throwable) {
+                    AppLog.w("Player", "enqueue download failed", t)
+                    popup?.dismiss()
+                    AppToast.showLong(this@PlayerActivity, "下载失败：${t.message ?: "未知错误"}")
+                }
+            }
+    }
+
+    private fun startBatchVideoDownloadInternal(
+        qn: Int,
+        items: List<PlayerPlaylistItem>,
+    ) {
+        var job: Job? = null
+        val popup =
+            AppPopup.progress(
+                context = this,
+                title = "批量下载",
+                status = "准备 0/${items.size}…",
+                negativeText = "取消",
+                cancelable = false,
+                onNegative = { job?.cancel() },
+            )
+        job =
+            lifecycleScope.launch {
+                var succeeded = 0
+                var failed = 0
+                try {
+                    items.forEachIndexed { index, item ->
+                        val cid = item.cid
+                        if (cid == null || cid <= 0L) {
+                            failed++
+                            return@forEachIndexed
+                        }
+                        popup?.updateStatus("解析地址 ${index + 1}/${items.size}…")
+                        popup?.updateProgress((index * 100) / items.size)
+                        try {
+                            val request =
+                                buildDownloadRequest(
+                                    qn = qn,
+                                    bvid = item.bvid,
+                                    aid = item.aid,
+                                    cid = cid,
+                                    epId = item.epId,
+                                    title = item.title ?: item.bvid,
+                                )
+                            DownloadService.enqueue(this@PlayerActivity, request)
+                            succeeded++
+                        } catch (t: Throwable) {
+                            failed++
+                            AppLog.w("Player", "batch resolve failed bvid=${item.bvid} cid=$cid", t)
+                        }
+                    }
+                    popup?.dismiss()
+                    val suffix = if (failed > 0) "，$failed 个解析失败" else ""
+                    AppToast.showLong(this@PlayerActivity, "已加入队列 $succeeded 个$suffix")
+                } catch (e: CancellationException) {
+                    popup?.dismiss()
+                    AppToast.show(this@PlayerActivity, "已取消批量下载")
+                }
+            }
+    }
+
+    /**
+     * 解析指定清晰度的音视频地址，构造下载任务请求。
+     * 复用播放器的 playurl 请求参数（最高清晰度 + 全部 DASH 能力）与风控兜底逻辑。
+     */
+    private suspend fun buildDownloadRequest(
+        qn: Int,
+        bvid: String,
+        aid: Long?,
+        cid: Long,
+        epId: Long?,
+        title: String,
+    ): DownloadService.Request {
+        val (_, fnval) = playUrlParamsForSession()
+        val fetched =
+            loadPlayableWithTryLookFallback(
+                bvid = bvid,
+                aid = aid,
+                cid = cid,
+                epId = epId,
+                qn = 127,
+                fnval = fnval,
+                constraints = playbackConstraints,
+            )
+        val dash = fetched.stream.dash ?: throw IOException("没有可用的 DASH 播放流")
+        val videoTrack =
+            dash.videos
+                .filter { it.qn == qn && it.urls.isNotEmpty() }
+                .maxByOrNull { it.info.bandwidth ?: 0L }
+                ?: throw IOException("没有 ${qnLabel(qn)} 清晰度的视频流")
+        val audioTrack = pickDownloadAudioTrack(dash.audios)
+        return DownloadService.Request(
+            taskId = java.util.UUID.randomUUID().toString(),
+            bvid = bvid,
+            cid = cid,
+            epId = epId,
+            title = title.ifBlank { bvid },
+            qnLabel = qnLabel(qn),
+            videoUrl = videoTrack.urls.first(),
+            videoProfile = videoTrack.mediaRequestProfile,
+            audioUrl = audioTrack.urls.first(),
+            audioProfile = audioTrack.mediaRequestProfile,
+        )
+    }
+
+    private fun pickDownloadAudioTrack(audios: List<AudioTrack>): AudioTrack {
+        val usable = audios.filter { it.urls.isNotEmpty() }
+        return usable.firstOrNull { it.id == session.preferAudioId }
+            ?: usable.filter { it.kind == VideoAudioKind.NORMAL }.maxByOrNull { it.info.bandwidth ?: 0L }
+            ?: usable.maxByOrNull { it.info.bandwidth ?: 0L }
+            ?: throw IOException("没有可用的音频流")
     }
 
     internal fun playUrlParamsForSession(): Pair<Int, Int> {

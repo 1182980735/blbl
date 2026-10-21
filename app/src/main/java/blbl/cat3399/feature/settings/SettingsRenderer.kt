@@ -391,6 +391,7 @@ class SettingsRenderer(
 
             "其他设置" ->
                 listOf(
+                    SettingEntry(SettingId.DownloadRecords, "下载记录", "查看/管理已下载视频", null),
                     SettingEntry(SettingId.PlayerRenderView, "渲染视图", SettingsText.renderViewText(prefs.playerRenderViewType), null),
                     SettingEntry(SettingId.PlayerEngineKind, "播放器内核", SettingsText.playerEngineText(prefs.playerEngineKind), null),
                     SettingEntry(

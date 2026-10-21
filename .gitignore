@@ -18,3 +18,11 @@ local.properties
 keystore/
 docs/
 libs/
+
+# IjkPlayer AAR 是编译必需依赖，必须随仓库分发（否则 clone 后无法构建）。
+!app/libs/
+!app/libs/ijkplayer-cmake-release.aar
+
+# 米家/小米云工具链与凭据（含设备 token，勿提交）
+.mijia/
+米家登录.command

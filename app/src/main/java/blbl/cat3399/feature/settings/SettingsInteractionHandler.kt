@@ -738,6 +738,11 @@ class SettingsInteractionHandler(
             }
             SettingId.GaiaVgate -> showGaiaVgateDialog(state.currentSectionIndex, entry.id)
             SettingId.ClearCache -> showClearCacheDialog(state.currentSectionIndex, entry.id)
+            SettingId.DownloadRecords -> {
+                activity.startActivity(
+                    android.content.Intent(activity, blbl.cat3399.feature.player.DownloadsActivity::class.java),
+                )
+            }
             SettingId.ConfigTransfer -> showConfigTransferDialog()
             SettingId.ClearLogin -> showClearLoginDialog(state.currentSectionIndex, entry.id)
             SettingId.ExportLogs -> {
