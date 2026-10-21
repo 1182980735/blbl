@@ -33,7 +33,8 @@ object ApkUpdater {
     private const val RELEASES_BASE = "https://github.com/$REPO_OWNER/$REPO_NAME/releases"
     private const val DEBUG_APK_URL = "$RELEASES_BASE/latest/download/blbl-latest-debug.apk"
     private const val RELEASE_APK_URL = "$RELEASES_BASE/latest/download/blbl-latest-release.apk"
-    private const val CHANGELOG_URL = "https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main/CHANGELOG.md"
+    // CHANGELOG 托管在 Release 资产里（raw.githubusercontent.com 在国内经常被重置）。
+    private const val CHANGELOG_URL = "$RELEASES_BASE/latest/download/CHANGELOG.md"
     val TEST_APK_URL: String
         get() = if (BuildConfig.DEBUG) DEBUG_APK_URL else RELEASE_APK_URL
     val TEST_CHANGELOG_URL: String
