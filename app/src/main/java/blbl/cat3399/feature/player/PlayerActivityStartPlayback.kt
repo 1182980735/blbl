@@ -278,7 +278,7 @@ internal fun PlayerActivity.resetPlaybackStateForNewMedia(
     binding.settingsPanel.visibility = View.GONE
     binding.commentsPanel.visibility = View.GONE
     binding.playerInfoPanel.visibility = View.GONE
-    hideBottomCardPanel(restoreFocus = false, dismissTarget = null)
+    hideBottomCardPanel(finalizeOverlaySession = false)
     hideSponsorSubmitPanel(restorePlayback = false)
     menuRevealedPanelSessionActive = false
     val commentViews = binding.videoCommentsPanelContent()
@@ -290,6 +290,8 @@ internal fun PlayerActivity.resetPlaybackStateForNewMedia(
     playbackConstraints = PlaybackConstraints()
     decodeFallbackAttemptCount = 0
     lastPickedDash = null
+    seamlessQualitySwitchDisabledForPlayback = false
+    pendingResolutionSuccessHintQn = null
     engine.stop()
     (engine as? ExoPlayerEngine)?.exoPlayer?.let { applySubtitleEnabled(it) }
     applyPlaybackMode(engine)
@@ -360,6 +362,9 @@ internal fun PlayerActivity.startPlayback(
             ?: parseBangumiSeasonIdFromSource(pageListSource)
     currentCid = -1L
     currentVideoIsPortrait = null
+    if (isPgcLikePlayback()) {
+        session = session.copy(preferredQn = BiliClient.prefs.playerPreferredQnPgc, targetQn = 0)
+    }
 
     trace =
         PlayerActivity.PlaybackTrace(
@@ -509,7 +514,7 @@ internal fun PlayerActivity.startPlayback(
                     if (subtitleSupported && session.subtitleEnabled) {
                         async(Dispatchers.IO) {
                             trace?.log("subtitle:start", "reason=start_enabled")
-                            prepareSubtitleConfig(detail, resolvedBvid, cid, trace)
+                            prepareSubtitleConfig(detail, resolvedBvid, cid, currentAid, trace)
                                 .also { trace?.log("subtitle:done", "reason=start_enabled ok=${it != null}") }
                         }
                             .also(startupJobs::add)
@@ -525,6 +530,22 @@ internal fun PlayerActivity.startPlayback(
                     trace?.log("duration:playurl", "duration=${durationMs}ms")
                 }
                 showRiskControlBypassHintIfNeeded(playStream)
+                val initialResume =
+                    if (pendingSeekMs == null) {
+                        resolveInitialAutoResume(
+                            playStream = playStream,
+                            bvid = resolvedBvid,
+                            cid = cid,
+                            playbackToken = autoResumeToken,
+                        )
+                    } else {
+                        null
+                    }
+                val initialPositionMs = pendingSeekMs?.coerceAtLeast(0L) ?: initialResume?.positionMs
+                trace?.log(
+                    "player:initialPosition",
+                    "position=${initialPositionMs ?: -1L}ms source=${initialResume?.source ?: if (pendingSeekMs != null) "engine_switch" else "none"}",
+                )
                 lastAvailableQns = parseDashVideoQnList(playStream)
                 lastAvailableAudioIds = parseDashAudioIdList(playStream, constraints = playbackConstraints)
                 logPlayUrlTrackSummary(source = "start", stream = playStream, constraints = playbackConstraints)
@@ -553,7 +574,15 @@ internal fun PlayerActivity.startPlayback(
                         lastPickedDash = playable
                         debug.cdnHost = runCatching { Uri.parse(playable.videoUrl).host }.getOrNull()
                         logPickedPlayable(source = "start", playable = playable)
-                        engine.setSource(PlaybackSource.Vod(playable = playable, subtitle = subtitleConfig, durationMs = currentViewDurationMs))
+                        engine.setSource(
+                            PlaybackSource.Vod(
+                                playable = playable,
+                                subtitle = subtitleConfig,
+                                durationMs = currentViewDurationMs,
+                                initialPositionMs = initialPositionMs,
+                                seamlessQualitySwitchEnabled = session.seamlessQualitySwitchEnabled && !seamlessQualitySwitchDisabledForPlayback,
+                            ),
+                        )
                         applyResolutionFallbackIfNeeded(requestedQn = session.targetQn, actualQn = playable.qn)
                         applyAudioFallbackIfNeeded(requestedAudioId = session.targetAudioId, actualAudioId = playable.audioId)
                     }
@@ -564,7 +593,15 @@ internal fun PlayerActivity.startPlayback(
                         (binding.recyclerSettings.adapter as? PlayerSettingsAdapter)?.let { refreshSettings(it) }
                         debug.cdnHost = runCatching { Uri.parse(playable.videoUrl).host }.getOrNull()
                         logPickedPlayable(source = "start", playable = playable)
-                        engine.setSource(PlaybackSource.Vod(playable = playable, subtitle = subtitleConfig, durationMs = currentViewDurationMs))
+                        engine.setSource(
+                            PlaybackSource.Vod(
+                                playable = playable,
+                                subtitle = subtitleConfig,
+                                durationMs = currentViewDurationMs,
+                                initialPositionMs = initialPositionMs,
+                                seamlessQualitySwitchEnabled = session.seamlessQualitySwitchEnabled && !seamlessQualitySwitchDisabledForPlayback,
+                            ),
+                        )
                         applyResolutionFallbackIfNeeded(requestedQn = session.targetQn, actualQn = playable.qn)
                     }
 
@@ -574,7 +611,15 @@ internal fun PlayerActivity.startPlayback(
                         (binding.recyclerSettings.adapter as? PlayerSettingsAdapter)?.let { refreshSettings(it) }
                         debug.cdnHost = runCatching { Uri.parse(playable.url).host }.getOrNull()
                         logPickedPlayable(source = "start", playable = playable)
-                        engine.setSource(PlaybackSource.Vod(playable = playable, subtitle = subtitleConfig, durationMs = currentViewDurationMs))
+                        engine.setSource(
+                            PlaybackSource.Vod(
+                                playable = playable,
+                                subtitle = subtitleConfig,
+                                durationMs = currentViewDurationMs,
+                                initialPositionMs = initialPositionMs,
+                                seamlessQualitySwitchEnabled = session.seamlessQualitySwitchEnabled && !seamlessQualitySwitchDisabledForPlayback,
+                            ),
+                        )
                     }
                 }
                 trace?.log("player:setSource:done")
@@ -583,16 +628,14 @@ internal fun PlayerActivity.startPlayback(
                 engine.prepare()
                 trace?.log("player:playWhenReady")
                 engine.playWhenReady = pendingPlayWhenReady ?: true
-                if (pendingSeekMs != null && pendingSeekMs > 0L) {
-                    engine.seekTo(pendingSeekMs)
-                }
                 updateSubtitleButton()
-                maybeScheduleAutoResume(
-                    playStream = playStream,
-                    bvid = resolvedBvid,
-                    cid = cid,
-                    playbackToken = autoResumeToken,
-                )
+                initialResume?.let { resume ->
+                    scheduleInitialAutoResumeHint(
+                        engine = engine,
+                        initialResume = resume,
+                        playbackToken = autoResumeToken,
+                    )
+                }
                 maybeStartAutoSkipSegments(
                     playStream = playStream,
                     bvid = resolvedBvid,
@@ -1095,7 +1138,12 @@ internal fun PlayerActivity.applyPerVideoPreferredQn(detail: VideoDetail, cid: L
 
     val isPortraitVideo = (effectiveW > 0 && effectiveH > 0 && effectiveH > effectiveW)
     currentVideoIsPortrait = isPortraitVideo
-    val preferredQn = if (isPortraitVideo) prefs.playerPreferredQnPortrait else prefs.playerPreferredQn
+    val preferredQn =
+        when {
+            isPgcLikePlayback() -> prefs.playerPreferredQnPgc
+            isPortraitVideo -> prefs.playerPreferredQnPortrait
+            else -> prefs.playerPreferredQn
+        }
     if (session.preferredQn != preferredQn) {
         session = session.copy(preferredQn = preferredQn)
     }

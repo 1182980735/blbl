@@ -19,6 +19,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+internal fun shouldShowPlayerOsd(
+    requestedVisible: Boolean,
+    hasOverlayPanel: Boolean,
+    touchLocked: Boolean,
+): Boolean = requestedVisible && !hasOverlayPanel && !touchLocked
+
 internal fun PlayerActivity.seekRelative(deltaMs: Long) {
     seekRelative(deltaMs, danmakuImmediate = true)
 }
@@ -52,7 +58,15 @@ internal fun PlayerActivity.toggleControls() {
 }
 
 internal fun PlayerActivity.setControlsVisible(visible: Boolean) {
-    val show = (visible || isSidePanelVisible() || isSponsorSubmitPanelVisible()) && !isTouchLocked()
+    val show =
+        shouldShowPlayerOsd(
+            requestedVisible = visible,
+            hasOverlayPanel = isOverlayPanelVisible(),
+            touchLocked = isTouchLocked(),
+        )
+    if (!show && osdMode == PlayerActivity.OsdMode.Full) {
+        rememberOsdFocusBeforeHide()
+    }
     seekOsdHideJob?.cancel()
     seekOsdHideJob = null
     seekOsdToken = 0L
@@ -72,7 +86,7 @@ internal fun PlayerActivity.setControlsVisible(visible: Boolean) {
     syncPlayerInfoPanelVisibility()
     updatePersistentBottomProgressBarVisibility()
     onTouchOverlayStateChanged()
-    if (visible) noteUserInteraction() else autoHideJob?.cancel()
+    if (show) noteUserInteraction() else autoHideJob?.cancel()
 }
 
 internal fun PlayerActivity.isTopBarContentVisible(): Boolean = osdMode != PlayerActivity.OsdMode.Hidden
@@ -97,7 +111,7 @@ internal fun PlayerActivity.updateTopBarUi() {
 }
 
 internal fun PlayerActivity.showSeekOsd() {
-    if (isSidePanelVisible() || isSponsorSubmitPanelVisible()) return
+    if (isOverlayPanelVisible()) return
     if (osdMode == PlayerActivity.OsdMode.Full) {
         // Full OSD already has the progress bar; keep it alive.
         noteUserInteraction()
@@ -119,7 +133,7 @@ internal fun PlayerActivity.showSeekOsd() {
 }
 
 internal fun PlayerActivity.showSeekOsd(posMs: Long, durationMs: Long, bufferedPosMs: Long) {
-    if (isSidePanelVisible() || isSponsorSubmitPanelVisible()) return
+    if (isOverlayPanelVisible()) return
     val duration = durationMs.coerceAtLeast(0L)
     val pos = posMs.coerceAtLeast(0L)
     val bufPos = bufferedPosMs.coerceAtLeast(0L)
@@ -217,6 +231,7 @@ internal fun PlayerActivity.cancelVideoShotPreviewHide() {
 
 internal fun PlayerActivity.hideVideoShotPreviewNow() {
     cancelVideoShotPreviewHide()
+    videoShotPreviewRequestId += 1L
     binding.videoShotPreview.visibility = View.GONE
     videoShotFetchJob?.cancel()
 }
@@ -226,6 +241,7 @@ internal fun PlayerActivity.scheduleHideVideoShotPreviewAfterSeek() {
     videoShotPreviewHideJob =
         lifecycleScope.launch {
             delay(PlayerActivity.VIDEOSHOT_PREVIEW_HIDE_AFTER_SEEK_MS)
+            videoShotPreviewRequestId += 1L
             binding.videoShotPreview.visibility = View.GONE
             videoShotFetchJob?.cancel()
             videoShotPreviewHideJob = null
@@ -239,13 +255,12 @@ internal fun PlayerActivity.showVideoShotPreviewForSeek(
     trackView: View,
 ) {
     cancelVideoShotPreviewHide()
-    binding.videoShotPreview.visibility = View.VISIBLE
     updateVideoShotPreview(progress, max, positionMs, trackView)
 }
 
 internal fun PlayerActivity.updatePersistentBottomProgressBarVisibility() {
     val enabled = session.persistentBottomProgressEnabled
-    val showControls = osdMode != PlayerActivity.OsdMode.Hidden || isSidePanelVisible() || isSponsorSubmitPanelVisible()
+    val showControls = osdMode != PlayerActivity.OsdMode.Hidden || isOverlayPanelVisible()
     val persistentV = if (enabled && !showControls && !transientSeekOsdVisible) View.VISIBLE else View.GONE
     if (binding.progressPersistentBottom.visibility != persistentV) binding.progressPersistentBottom.visibility = persistentV
 
@@ -258,8 +273,7 @@ internal fun PlayerActivity.restartAutoHideTimer() {
     val exo = player ?: return
     if (isTouchLocked()) return
     if (osdMode != PlayerActivity.OsdMode.Full) return
-    if (isSidePanelVisible()) return
-    if (isSponsorSubmitPanelVisible()) return
+    if (isOverlayPanelVisible()) return
     if (scrubbing) return
     if (!exo.isPlaying) return
     val token = lastInteractionAtMs
@@ -334,6 +348,21 @@ internal fun PlayerActivity.hasControlsFocusOutsideSeekBar(): Boolean {
         (binding.bottomBar.hasFocus() && !binding.seekProgress.isFocused)
 }
 
+private fun PlayerActivity.rememberOsdFocusBeforeHide() {
+    val focused = currentFocus ?: return
+    val focusIsInOsd =
+        binding.topBar.hasFocus() ||
+            binding.cardUpQuick.hasFocus() ||
+            binding.bottomBar.hasFocus()
+    if (focusIsInOsd) osdFocusReturn.capture(focused)
+}
+
+internal fun PlayerActivity.restoreLastOsdFocusOr(fallback: () -> Unit) {
+    binding.root.post {
+        if (!osdFocusReturn.restoreAndClear(postOnFail = false)) fallback()
+    }
+}
+
 internal fun PlayerActivity.focusFirstControl() {
     binding.btnPlayPause.post { binding.btnPlayPause.requestFocus() }
 }
@@ -366,6 +395,7 @@ internal fun PlayerActivity.focusDownKeyOsdTargetControl() {
         }
 
     binding.controlsRow.post {
+        if (osdFocusReturn.restoreAndClear(postOnFail = false)) return@post
         if (requestFocusControlNow(target)) return@post
         if (requestFocusControlNow(binding.btnPlayPause)) return@post
         focusFirstControl()
@@ -444,6 +474,10 @@ internal fun PlayerActivity.beginKeySeekPending(keyCode: Int, direction: Int, sh
             if (holdSeekJob != null) return@launch
             if (direction < 0) {
                 // Long-press LEFT: always use preview-scrub rewind (independent of hold-seek mode setting).
+                startHoldScrub(direction = direction, showControls = showControls)
+            } else if (binding.seekProgress.isFocused) {
+                // The focused timeline owns LEFT/RIGHT hold semantics and must not inherit the
+                // fullscreen hold-to-speed preference.
                 startHoldScrub(direction = direction, showControls = showControls)
             } else {
                 startHoldSeek(direction = direction, showControls = showControls)
@@ -811,8 +845,12 @@ internal fun PlayerActivity.updateVideoShotPreview(
     }
 
     val previewView = binding.videoShotPreview
-    val shot = currentVideoShot ?: return
-    val cache = videoShotImageCache ?: return
+    val shot = currentVideoShot
+    val cache = videoShotImageCache
+    if (shot == null || cache == null) {
+        hideVideoShotPreviewNow()
+        return
+    }
     previewView.setContentAspectRatio(
         width = currentVideoContentWidth ?: shot.fallbackAspectWidth,
         height = currentVideoContentHeight ?: shot.fallbackAspectHeight,
@@ -821,7 +859,10 @@ internal fun PlayerActivity.updateVideoShotPreview(
         disableVideoShotPreviewForCurrentVideo(reason = "draw", throwable = t)
     }
 
+    val requestId = videoShotPreviewRequestId + 1L
+    videoShotPreviewRequestId = requestId
     videoShotFetchJob?.cancel()
+    previewView.visibility = if (previewView.spriteFrame == null) View.INVISIBLE else View.VISIBLE
     videoShotFetchJob = lifecycleScope.launch {
         delay(16) // 16ms 防抖
         val frame =
@@ -833,12 +874,19 @@ internal fun PlayerActivity.updateVideoShotPreview(
                 return@launch
             }
 
-        if (currentVideoShot !== shot || videoShotImageCache !== cache) return@launch
+        if (
+            videoShotPreviewRequestId != requestId ||
+            currentVideoShot !== shot ||
+            videoShotImageCache !== cache
+        ) {
+            return@launch
+        }
 
         previewView.spriteFrame = frame
         positionVideoShotPreviewX(previewView, trackView, progress, max)
+        previewView.visibility = View.VISIBLE
         previewView.post {
-            if (previewView.spriteFrame === frame) {
+            if (videoShotPreviewRequestId == requestId && previewView.spriteFrame === frame) {
                 positionVideoShotPreviewX(previewView, trackView, progress, max)
             }
         }
@@ -847,6 +895,7 @@ internal fun PlayerActivity.updateVideoShotPreview(
 
 internal fun PlayerActivity.disableVideoShotPreviewForCurrentVideo(reason: String, throwable: Throwable? = null) {
     AppLog.w("Player", "disable videoShot preview reason=$reason bvid=$currentBvid cid=$currentCid", throwable)
+    videoShotPreviewRequestId += 1L
     videoShotFetchJob?.cancel()
     videoShotFetchJob = null
     videoShotImageCache?.clear()
