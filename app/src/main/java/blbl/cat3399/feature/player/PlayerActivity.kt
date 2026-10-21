@@ -3794,6 +3794,7 @@ class PlayerActivity : BaseActivity() {
             cid = cid,
             epId = epId,
             title = title.ifBlank { bvid },
+            qn = qn,
             qnLabel = qnLabel(qn),
             videoUrl = videoTrack.urls.first(),
             videoProfile = videoTrack.mediaRequestProfile,

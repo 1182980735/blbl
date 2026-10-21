@@ -10,43 +10,69 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
+/**
+ * 直播相关API内部封装类
+ *
+ * 提供直播功能相关的API封装，包括：
+ * - 直播分区列表
+ * - 推荐直播间
+ * - 指定分区直播间列表
+ * - 关注直播间列表
+ * - 直播间信息
+ * - 直播播放地址
+ * - 直播弹幕服务器信息
+ */
 internal object LiveApi {
-    private const val LIVE_AREAS_CACHE_TTL_MS = 12 * 60 * 60 * 1000L // 12h
+    /** 直播分区缓存时间（12小时） */
+    private const val LIVE_AREAS_CACHE_TTL_MS = 12 * 60 * 60 * 1000L
+    /** 直播原始流索引m3u8路径匹配正则 */
     private val LIVE_ORIGIN_INDEX_M3U8_REGEX = Regex("""(/live-bvc/\d+/live_\d+_\d+)(?:_[^/]+)?(/index\.m3u8)$""")
+    /** 直播原始流m3u8路径匹配正则 */
     private val LIVE_ORIGIN_M3U8_REGEX = Regex("""(/live-bvc/\d+/live_\d+_\d+)(?:_[^/\.]+)?(\.m3u8)$""")
-    // Issue #35: Prefer known-good origin hosts instead of rewriting every API host.
-    // Keep this list small and easy to extend.
+    /**
+     * 已知可用的原始流主机列表（用于高码率直播）
+     *
+     * Issue #35: 优先使用已知可用的原始流主机，而不是重写每个API主机。
+     * 保持列表精简，便于扩展。
+     */
     private val LIVE_ORIGIN_HOST_OVERRIDES = listOf("https://d1--cn-gotcha204.bilivideo.com")
 
+    /** 直播分区缓存数据类 */
     private data class LiveAreasCache(
         val fetchedAtMs: Long,
         val items: List<LiveAreaParent>,
     )
 
+    /** 直播分区缓存实例 */
     @Volatile private var liveAreasCache: LiveAreasCache? = null
 
+    /** JSON对象抽象接口，用于统一解析不同来源的JSON数据 */
     internal interface JsonObj {
         fun optString(name: String, fallback: String): String
-
         fun optLong(name: String): Long
-
         fun optLong(name: String, fallback: Long): Long
-
         fun optInt(name: String, fallback: Int): Int
     }
 
+    /** JSONObject的JsonObj接口实现 */
     private class OrgJsonObj(
         private val obj: JSONObject,
     ) : JsonObj {
         override fun optString(name: String, fallback: String): String = obj.optString(name, fallback)
-
         override fun optLong(name: String): Long = obj.optLong(name)
-
         override fun optLong(name: String, fallback: Long): Long = obj.optLong(name, fallback)
-
         override fun optInt(name: String, fallback: Int): Int = obj.optInt(name, fallback)
     }
 
+    /**
+     * 获取直播分区列表
+     *
+     * 支持缓存机制，默认缓存12小时。
+     *
+     * @param force 是否强制刷新缓存
+     * @return 直播父分区列表
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun liveAreas(force: Boolean = false): List<LiveAreaParent> {
         val now = System.currentTimeMillis()
         val cached = liveAreasCache
@@ -65,14 +91,29 @@ internal object LiveApi {
         return areas
     }
 
+    /**
+     * 获取推荐直播间列表
+     *
+     * 优先尝试从index接口获取，如果失败或返回空列表则回退到webMain接口。
+     * 该接口是公开接口，参数保持最小化以避免额外的风控。
+     *
+     * @param page 页码，默认1
+     * @return 推荐直播间列表
+     */
     suspend fun liveRecommend(page: Int = 1): List<LiveRoomCard> {
-        // This endpoint is public; keep params minimal to avoid extra risk controls.
         val p = page.coerceAtLeast(1)
         val listFromIndex = runCatching { liveRecommendFromIndex(page = p) }.getOrNull()
         if (!listFromIndex.isNullOrEmpty()) return listFromIndex
         return liveRecommendFromWebMain(page = p)
     }
 
+    /**
+     * 从index接口获取推荐直播间（主接口）
+     *
+     * @param page 页码
+     * @return 推荐直播间列表
+     * @throws BiliApiException API调用失败时抛出
+     */
     private suspend fun liveRecommendFromIndex(page: Int): List<LiveRoomCard> {
         val url =
             BiliClient.withQuery(
@@ -105,6 +146,13 @@ internal object LiveApi {
         return withContext(Dispatchers.Default) { parseLiveRecommendRooms(list) }
     }
 
+    /**
+     * 从webMain接口获取推荐直播间（备用接口）
+     *
+     * @param page 页码
+     * @return 推荐直播间列表
+     * @throws BiliApiException API调用失败时抛出
+     */
     private suspend fun liveRecommendFromWebMain(page: Int): List<LiveRoomCard> {
         val url =
             BiliClient.withQuery(
@@ -124,6 +172,17 @@ internal object LiveApi {
         return withContext(Dispatchers.Default) { parseLiveRecommendRooms(list) }
     }
 
+    /**
+     * 获取指定分区的直播间列表
+     *
+     * @param parentAreaId 父分区ID
+     * @param areaId 子分区ID
+     * @param page 页码，默认1
+     * @param pageSize 每页大小，默认30，范围1-60
+     * @param sortType 排序方式，默认online（在线人数）
+     * @return 直播间列表
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun liveAreaRooms(
         parentAreaId: Int,
         areaId: Int,
@@ -152,6 +211,16 @@ internal object LiveApi {
         return withContext(Dispatchers.Default) { parseLiveAreaRooms(data) }
     }
 
+    /**
+     * 获取关注的直播间列表
+     *
+     * 需要登录（SESSDATA）才能获取。未登录时返回空列表。
+     *
+     * @param page 页码，默认1
+     * @param pageSize 每页大小，默认10，范围1-10
+     * @return 关注直播间分页结果
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun liveFollowing(
         page: Int = 1,
         pageSize: Int = 10,
@@ -184,6 +253,13 @@ internal object LiveApi {
         return BiliApi.HasMorePage(items = items, page = p, hasMore = p < totalPage, total = data.optInt("count", 0))
     }
 
+    /**
+     * 获取直播间详细信息
+     *
+     * @param roomId 房间ID
+     * @return 直播间信息
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun liveRoomInfo(roomId: Long): BiliApi.LiveRoomInfo {
         val url =
             BiliClient.withQuery(
@@ -209,6 +285,12 @@ internal object LiveApi {
         )
     }
 
+    /**
+     * 执行进入直播间操作（用于记录访问记录）
+     *
+     * @param roomId 房间ID
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun liveRoomEntryAction(roomId: Long) {
         if (roomId <= 0L) error("live_room_entry_invalid_room_id")
         val csrf = BiliClient.cookies.getCookieValue("bili_jct").orEmpty().trim()
@@ -239,6 +321,21 @@ internal object LiveApi {
         }
     }
 
+    /**
+     * 获取直播播放地址
+     *
+     * B站直播间的可用直播流组合会动态变化；不少房间只返回 http_hls/fmp4(m3u8)。
+     * 为提高兼容性，按官方文档传多选，让服务端返回可用集合，再在客户端挑最合适的组合。
+     *
+     * 默认行为：优先选择 http_stream (flv/fmp4)，因为其启动延迟更低且稳定性更好。
+     * 仅当用户显式启用高码率直播模式时，才优先选择 http_hls。
+     *
+     * @param roomId 房间ID
+     * @param qn 清晰度等级
+     * @param highBitrateEnabled 是否开启高码率
+     * @return 直播播放地址信息
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun livePlayUrl(
         roomId: Long,
         qn: Int,
@@ -249,11 +346,9 @@ internal object LiveApi {
                 "https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo",
                 mapOf(
                     "room_id" to roomId.toString(),
-                    // B 站直播间的可用直播流组合会动态变化；不少房间只返回 http_hls/fmp4(m3u8)。
-                    // 为提高兼容性，按官方文档传多选，让服务端返回可用集合，再在客户端挑最合适的组合。
-                    "protocol" to "0,1", // 0=http_stream, 1=http_hls
-                    "format" to "0,1,2", // 0=flv, 1=ts, 2=fmp4
-                    "codec" to "0,1", // 0=avc, 1=hevc
+                    "protocol" to "0,1",
+                    "format" to "0,1,2",
+                    "codec" to "0,1",
                     "qn" to qn.coerceAtLeast(1).toString(),
                 ),
             )
@@ -276,8 +371,6 @@ internal object LiveApi {
         }
 
         val streamArr = playurl.optJSONArray("stream") ?: JSONArray()
-        // Default behavior: prefer http_stream (flv/fmp4) for lower startup latency and better stability.
-        // Only prefer http_hls when user explicitly enables higher-bitrate live mode.
         val protocolOrder =
             if (highBitrateEnabled) {
                 listOf("http_hls", "http_stream")
@@ -343,8 +436,6 @@ internal object LiveApi {
         val baseUrl = codec.optString("base_url", "").trim()
         val urlInfo = codec.optJSONArray("url_info") ?: JSONArray()
         val enableHighBitrate = highBitrateEnabled
-        // Prefer the known-good origin host(s) first (higher bitrate), keep signed candidates as fallback.
-        // This is gated by caller/session because some rooms/CDNs may reject the rewritten url.
         val originUrls = ArrayList<String>(LIVE_ORIGIN_HOST_OVERRIDES.size + 1)
         val signedUrls = ArrayList<String>(urlInfo.length() + 2)
         val seen = HashSet<String>(urlInfo.length() * 2 + LIVE_ORIGIN_HOST_OVERRIDES.size * 2)
@@ -384,6 +475,15 @@ internal object LiveApi {
         return BiliApi.LivePlayUrl(currentQn = currentQn, acceptQn = acceptQn, qnDesc = qnDesc, lines = lines)
     }
 
+    /**
+     * 尝试构建直播原始流HLS地址
+     *
+     * 使用已知可用的原始流主机构建高码率直播地址。
+     *
+     * @param host 原始流主机地址
+     * @param baseUrl 基础路径
+     * @return 构建的HLS地址，无效输入返回null
+     */
     internal fun tryBuildLiveOriginHlsUrl(host: String, baseUrl: String): String? {
         val h = host.trim().trimEnd('/')
         val base = baseUrl.trim()
@@ -394,6 +494,14 @@ internal object LiveApi {
         return h + rewriteLiveOriginM3u8Path(path)
     }
 
+    /**
+     * 重写直播原始流m3u8路径
+     *
+     * 将带后缀的m3u8路径重写为原始流路径，以获取更高码率的直播流。
+     *
+     * @param path 原始路径
+     * @return 重写后的路径
+     */
     internal fun rewriteLiveOriginM3u8Path(path: String): String {
         val p = path.trim()
         val lower = p.lowercase()
@@ -412,6 +520,13 @@ internal object LiveApi {
         }
     }
 
+    /**
+     * 获取直播弹幕服务器信息
+     *
+     * @param roomId 房间ID
+     * @return 弹幕服务器信息，包含token和服务器列表
+     * @throws BiliApiException API调用失败时抛出
+     */
     suspend fun liveDanmuInfo(roomId: Long): BiliApi.LiveDanmuInfo {
         WebCookieMaintainer.ensureWebFingerprintCookies()
         val keys = BiliClient.ensureWbiKeys()
@@ -457,6 +572,12 @@ internal object LiveApi {
         return BiliApi.LiveDanmuInfo(token = token, hosts = hosts)
     }
 
+    /**
+     * 获取直播 SC（Super Chat）消息列表
+     *
+     * @param roomId 直播间ID
+     * @return SC 消息列表
+     */
     suspend fun liveSuperChats(roomId: Long): List<LiveSuperChat> {
         if (roomId <= 0L) return emptyList()
         val url =
@@ -482,6 +603,12 @@ internal object LiveApi {
         return withContext(Dispatchers.Default) { parseLiveSuperChats(list) }
     }
 
+    /**
+     * 解析 SC 消息列表
+     *
+     * @param source SC 消息 JSON 数组
+     * @return 解析后的 SC 消息列表
+     */
     internal fun parseLiveSuperChats(source: JSONArray): List<LiveSuperChat> =
         buildList {
             for (index in 0 until source.length()) {
@@ -490,6 +617,12 @@ internal object LiveApi {
             }
         }
 
+    /**
+     * 解析直播分区列表
+     *
+     * @param arr 分区数据JSON数组
+     * @return 解析后的父分区列表
+     */
     private fun parseLiveAreas(arr: JSONArray): List<LiveAreaParent> {
         val out = ArrayList<LiveAreaParent>(arr.length())
         for (i in 0 until arr.length()) {
@@ -520,6 +653,12 @@ internal object LiveApi {
         return out
     }
 
+    /**
+     * 解析推荐直播间列表
+     *
+     * @param arr 直播间数据JSON数组
+     * @return 解析后的直播间列表
+     */
     private fun parseLiveRecommendRooms(arr: JSONArray): List<LiveRoomCard> {
         val out = ArrayList<LiveRoomCard>(arr.length())
         for (i in 0 until arr.length()) {
@@ -547,6 +686,12 @@ internal object LiveApi {
         return out
     }
 
+    /**
+     * 解析分区直播间列表
+     *
+     * @param arr 直播间数据JSON数组
+     * @return 解析后的直播间列表
+     */
     private fun parseLiveAreaRooms(arr: JSONArray): List<LiveRoomCard> {
         val out = ArrayList<LiveRoomCard>(arr.length())
         for (i in 0 until arr.length()) {
@@ -585,6 +730,12 @@ internal object LiveApi {
         return out
     }
 
+    /**
+     * 解析关注直播间信息
+     *
+     * @param obj 直播间信息JSON对象
+     * @return 解析后的直播间卡片，解析失败返回null
+     */
     internal fun parseLiveFollowingRoom(obj: JsonObj): LiveRoomCard? {
         val roomId = obj.optLong("roomid").takeIf { it > 0 } ?: return null
         val online = parseCnCount(obj.optString("text_small", "0").trim())
@@ -606,6 +757,12 @@ internal object LiveApi {
         )
     }
 
+    /**
+     * 解析关注直播间列表
+     *
+     * @param arr 直播间数据JSON数组
+     * @return 解析后的直播间列表
+     */
     private fun parseLiveFollowingRooms(arr: JSONArray): List<LiveRoomCard> {
         val out = ArrayList<LiveRoomCard>(arr.length())
         for (i in 0 until arr.length()) {
@@ -615,6 +772,14 @@ internal object LiveApi {
         return out
     }
 
+    /**
+     * 解析中文数字格式的计数文本
+     *
+     * 支持解析"123"、"12.3万"、"1.2亿"等格式。
+     *
+     * @param text 原始计数文本
+     * @return 解析后的数字
+     */
     internal fun parseCnCount(text: String): Long {
         val t = text.trim()
         if (t.isBlank()) return 0L

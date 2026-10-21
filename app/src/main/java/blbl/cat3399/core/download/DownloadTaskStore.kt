@@ -82,6 +82,29 @@ object DownloadTaskStore {
         }
     }
 
+    /**
+     * 进程启动时调用：把上次进程被系统回收时残留的“进行中”任务标记为失败，
+     * 避免下载记录页一直显示假进度。
+     */
+    fun recoverInterruptedTasks() {
+        synchronized(lock) {
+            val now = System.currentTimeMillis()
+            var changed = false
+            cache.values.filter { it.isRunning }.forEach { task ->
+                cache[task.id] =
+                    task.copy(
+                        status = DownloadTask.Status.FAILED,
+                        progress = -1,
+                        stageText = "已中断",
+                        error = "应用进程被系统回收，任务已中断（可重试）",
+                        updatedAt = now,
+                    )
+                changed = true
+            }
+            if (changed) persistLocked()
+        }
+    }
+
     private fun loadLocked() {
         val raw = prefs?.getString(KEY_TASKS, null)?.takeIf { it.isNotBlank() } ?: return
         runCatching {

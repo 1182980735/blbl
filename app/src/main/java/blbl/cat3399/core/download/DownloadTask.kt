@@ -12,6 +12,8 @@ data class DownloadTask(
     val epId: Long?,
     val title: String,
     val qnLabel: String,
+    /** 清晰度 qn（重试时使用）。 */
+    val qn: Int,
     val status: Status,
     /** 0..100；未知时为 -1。 */
     val progress: Int,
@@ -43,6 +45,7 @@ data class DownloadTask(
             .put("epId", epId ?: -1L)
             .put("title", title)
             .put("qnLabel", qnLabel)
+            .put("qn", qn)
             .put("status", status.name)
             .put("progress", progress)
             .put("stageText", stageText)
@@ -61,6 +64,7 @@ data class DownloadTask(
                 epId = obj.optLong("epId", -1L).takeIf { it > 0L },
                 title = obj.optString("title"),
                 qnLabel = obj.optString("qnLabel"),
+                qn = obj.optInt("qn", 0),
                 status = runCatching { Status.valueOf(obj.optString("status")) }.getOrDefault(Status.FAILED),
                 progress = obj.optInt("progress", -1),
                 stageText = obj.optString("stageText").takeIf { it.isNotBlank() && it != "null" },

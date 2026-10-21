@@ -28,6 +28,7 @@ class BlblApp : Application() {
         AppLog.i("BlblApp", "onCreate")
         BiliClient.init(this)
         DownloadTaskStore.init(this)
+        DownloadTaskStore.recoverInterruptedTasks()
         appScope.launch {
             runCatching { WebCookieMaintainer.ensureDailyMaintenance() }
                 .onFailure { AppLog.w("BlblApp", "daily maintenance failed", it) }

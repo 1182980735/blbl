@@ -10,6 +10,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.EditText
 import androidx.core.content.FileProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import blbl.cat3399.core.download.DownloadTask
 import blbl.cat3399.core.download.DownloadTaskStore
@@ -24,6 +25,9 @@ import blbl.cat3399.core.ui.popup.PopupAction
 import blbl.cat3399.core.ui.popup.PopupActionRole
 import blbl.cat3399.core.ui.popup.PopupHandle
 import blbl.cat3399.databinding.ActivityDownloadsBinding
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import java.io.File
 
 /**
@@ -32,6 +36,7 @@ import java.io.File
 class DownloadsActivity : BaseActivity() {
     private lateinit var binding: ActivityDownloadsBinding
     private lateinit var adapter: DownloadRecordAdapter
+    private var retryJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -124,6 +129,9 @@ class DownloadsActivity : BaseActivity() {
             actions += "重命名"
         }
         if (task.isRunning) actions += "取消下载"
+        if ((task.status == DownloadTask.Status.FAILED || task.status == DownloadTask.Status.CANCELED) && task.qn > 0) {
+            actions += "重试"
+        }
         actions += "删除"
         AppPopup.singleChoice(
             context = this,
@@ -139,9 +147,56 @@ class DownloadsActivity : BaseActivity() {
                     AppToast.show(this, "已请求取消")
                 }
 
+                "重试" -> retryTask(task)
                 "删除" -> deleteTask(task)
             }
         }
+    }
+
+    /** 重试失败/已取消的任务：重新解析播放地址后入队。 */
+    private fun retryTask(task: DownloadTask) {
+        if (retryJob?.isActive == true) {
+            AppToast.show(this, "正在解析播放地址，请稍候")
+            return
+        }
+        if (task.qn <= 0) {
+            AppToast.show(this, "缺少清晰度信息，无法重试")
+            return
+        }
+        var job: Job? = null
+        val popup =
+            AppPopup.progress(
+                context = this,
+                title = "重试下载",
+                status = "获取播放地址…",
+                negativeText = "取消",
+                cancelable = false,
+                onNegative = { job?.cancel() },
+            )
+        job =
+            lifecycleScope.launch {
+                try {
+                    val request =
+                        DownloadRequestResolver.resolve(
+                            bvid = task.bvid,
+                            cid = task.cid,
+                            epId = task.epId,
+                            qn = task.qn,
+                            title = task.title,
+                        )
+                    DownloadService.enqueue(this@DownloadsActivity, request)
+                    popup?.dismiss()
+                    AppToast.showLong(this@DownloadsActivity, "已重新加入下载队列")
+                    refresh()
+                } catch (e: CancellationException) {
+                    popup?.dismiss()
+                } catch (t: Throwable) {
+                    AppLog.w("Downloads", "retry failed", t)
+                    popup?.dismiss()
+                    AppToast.showLong(this@DownloadsActivity, "重试失败：${t.message ?: "未知错误"}")
+                }
+            }
+        retryJob = job
     }
 
     private fun showRenameDialog(task: DownloadTask) {

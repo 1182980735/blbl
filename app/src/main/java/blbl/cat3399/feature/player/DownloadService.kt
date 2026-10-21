@@ -87,6 +87,7 @@ class DownloadService : Service() {
                 cid = job.cid,
                 epId = job.epId,
                 title = job.title,
+                qn = job.qn,
                 qnLabel = job.qnLabel,
                 status = DownloadTask.Status.QUEUED,
                 progress = -1,
@@ -378,6 +379,7 @@ class DownloadService : Service() {
             cid = intent.getLongExtra(EXTRA_CID, -1L),
             epId = intent.getLongExtra(EXTRA_EP_ID, -1L).takeIf { it > 0L },
             title = intent.getStringExtra(EXTRA_TITLE).orEmpty().ifBlank { "video" },
+            qn = intent.getIntExtra(EXTRA_QN, 0),
             qnLabel = intent.getStringExtra(EXTRA_QN_LABEL).orEmpty().ifBlank { "qn" },
             videoUrl = videoUrl,
             videoProfile = profileOf(intent.getStringExtra(EXTRA_VIDEO_PROFILE)),
@@ -395,6 +397,7 @@ class DownloadService : Service() {
         val cid: Long,
         val epId: Long?,
         val title: String,
+        val qn: Int,
         val qnLabel: String,
         val videoUrl: String,
         val videoProfile: VideoMediaRequestProfile,
@@ -409,6 +412,7 @@ class DownloadService : Service() {
         val cid: Long,
         val epId: Long?,
         val title: String,
+        val qn: Int,
         val qnLabel: String,
         val videoUrl: String,
         val videoProfile: VideoMediaRequestProfile,
@@ -431,6 +435,7 @@ class DownloadService : Service() {
         private const val EXTRA_CID = "cid"
         private const val EXTRA_EP_ID = "ep_id"
         private const val EXTRA_QN_LABEL = "qn_label"
+        private const val EXTRA_QN = "qn"
         private const val EXTRA_VIDEO_URL = "video_url"
         private const val EXTRA_VIDEO_PROFILE = "video_profile"
         private const val EXTRA_AUDIO_URL = "audio_url"
@@ -452,6 +457,7 @@ class DownloadService : Service() {
                     putExtra(EXTRA_CID, request.cid)
                     putExtra(EXTRA_EP_ID, request.epId ?: -1L)
                     putExtra(EXTRA_QN_LABEL, request.qnLabel)
+                    putExtra(EXTRA_QN, request.qn)
                     putExtra(EXTRA_VIDEO_URL, request.videoUrl)
                     putExtra(EXTRA_VIDEO_PROFILE, request.videoProfile.name)
                     putExtra(EXTRA_AUDIO_URL, request.audioUrl)
