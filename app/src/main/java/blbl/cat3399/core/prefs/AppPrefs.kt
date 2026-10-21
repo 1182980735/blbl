@@ -348,8 +348,10 @@ class AppPrefs(context: Context) {
         get() = prefs.getString(KEY_PLAYER_CODEC, "AVC") ?: "AVC"
         set(value) = prefs.edit().putString(KEY_PLAYER_CODEC, value).apply()
 
+    // 默认关闭：v0.1.29 引入的「无缝切换清晰度」在部分设备（尤其硬解设备）上会导致
+    // 花屏、绿屏、一直缓冲（解码器/Surface 兼容性问题）。需要该功能可在播放设置中手动开启。
     var playerSeamlessQualitySwitchEnabled: Boolean
-        get() = prefs.getBoolean(KEY_PLAYER_SEAMLESS_QUALITY_SWITCH_ENABLED, true)
+        get() = prefs.getBoolean(KEY_PLAYER_SEAMLESS_QUALITY_SWITCH_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_PLAYER_SEAMLESS_QUALITY_SWITCH_ENABLED, value).apply()
 
     var playerRenderViewType: String
